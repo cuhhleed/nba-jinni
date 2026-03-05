@@ -44,7 +44,6 @@ yarn-error.log*
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
-.terraform.lock.hcl
 terraform.tfplan
 override.tf
 override.tf.json

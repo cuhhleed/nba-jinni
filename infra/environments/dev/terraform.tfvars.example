@@ -1,0 +1,8 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored and should never be committed.
+
+aws_region   = "us-east-1"
+project_name = "nbajinni"
+environment  = "dev"
+db_username  = "your_db_username"
+db_password  = "your_db_password"
