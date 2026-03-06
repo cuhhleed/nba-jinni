@@ -6,7 +6,7 @@ resource "aws_vpc" "main" {
 
 
   tags = {
-    Name = "${var.project_name}-VPC"
+    Name = "${var.project_name}-${var.environment}-VPC"
   }
 }
 
@@ -21,7 +21,7 @@ resource "aws_subnet" "public_1" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-public-subnet-1"
+    Name = "${var.project_name}-${var.environment}-public-subnet-1"
   }
 }
 
@@ -31,7 +31,7 @@ resource "aws_subnet" "private_1" {
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, 2)
 
   tags = {
-    Name = "${var.project_name}-private-subnet-1"
+    Name = "${var.project_name}-${var.environment}-private-subnet-1"
   }
 }
 
@@ -42,7 +42,7 @@ resource "aws_subnet" "public_2" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-public-subnet-2"
+    Name = "${var.project_name}-${var.environment}-public-subnet-2"
   }
 }
 
@@ -52,7 +52,7 @@ resource "aws_subnet" "private_2" {
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, 4)
 
   tags = {
-    Name = "${var.project_name}-private-subnet-2"
+    Name = "${var.project_name}-${var.environment}-private-subnet-2"
   }
 }
 
@@ -60,7 +60,7 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-IGW"
+    Name = "${var.project_name}-${var.environment}-IGW"
   }
 }
 
@@ -73,7 +73,7 @@ resource "aws_route_table" "public_route_table" {
   }
 
   tags = {
-    Name = "${var.project_name}-public-RT"
+    Name = "${var.project_name}-${var.environment}-public-RT"
   }
 }
 
@@ -81,7 +81,7 @@ resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-private-RT"
+    Name = "${var.project_name}-${var.environment}-private-RT"
   }
 }
 
@@ -107,6 +107,7 @@ resource "aws_route_table_association" "private_association_2" {
 
 resource "aws_security_group" "rds_sg" {
   vpc_id = aws_vpc.main.id
+  name   = "${var.project_name}-${var.environment}-rds-sg"
 
   ingress {
     from_port       = 5432
@@ -123,12 +124,17 @@ resource "aws_security_group" "rds_sg" {
   }
 
   tags = {
-    Name = "${var.project_name}-RDS-SG"
+    Name = "${var.project_name}-${var.environment}-RDS-SG"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
 resource "aws_security_group" "lambda_sg" {
   vpc_id = aws_vpc.main.id
+  name   = "${var.project_name}-${var.environment}-lambda-sg"
 
   egress {
     from_port   = 0
@@ -138,6 +144,10 @@ resource "aws_security_group" "lambda_sg" {
   }
 
   tags = {
-    Name = "${var.project_name}-Lambda-SG"
+    Name = "${var.project_name}-${var.environment}-Lambda-SG"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
