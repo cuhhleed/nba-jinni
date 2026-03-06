@@ -3,6 +3,11 @@ variable "aws_region" {
   type        = string
 }
 
+variable "environment" {
+  description = "Deployment environment (dev, prod)"
+  type        = string
+}
+
 variable "project_name" {
   description = "Name of the project, used for resource naming and tagging"
   type        = string
@@ -21,7 +26,7 @@ variable "enable_dns_support" {
 }
 
 variable "enable_dns_hostnames" {
-  description = "Whethr or not DNS hostnames should be enabled in this VPC"
+  description = "Whether or not DNS hostnames should be enabled in this VPC"
   type        = bool
   default     = true
 }

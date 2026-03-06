@@ -17,3 +17,8 @@
 #   description = "CloudFront distribution domain for the frontend"
 #   value       = module.frontend.cloudfront_domain
 # }
+
+output "db_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing DB credentials"
+  value       = aws_secretsmanager_secret.db_credentials.arn
+}
