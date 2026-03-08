@@ -55,3 +55,15 @@ variable "filename" {
   description = "Path to the function's deployment package within the local filesystem."
   type        = string
 }
+
+variable "replacement_security_group_ids" {
+  description = "Security group IDs to replace the function's security groups with on destroy."
+  type        = list(string)
+  default     = []
+}
+
+variable "replace_security_groups_on_destroy" {
+  description = "Whether to replace the function's security groups with other security groups on destroy."
+  type        = bool
+  default     = true
+}
