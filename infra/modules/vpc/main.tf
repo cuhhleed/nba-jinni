@@ -1,12 +1,18 @@
+# NOTE: prevent_destroy is set on foundational network resources.
+# For a full teardown, temporarily remove these lifecycle blocks before running terraform destroy.
+
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   instance_tenancy     = "default"
   enable_dns_hostnames = var.enable_dns_hostnames
   enable_dns_support   = var.enable_dns_support
 
-
   tags = {
     Name = "${var.project_name}-${var.environment}-VPC"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -23,6 +29,10 @@ resource "aws_subnet" "public_1" {
   tags = {
     Name = "${var.project_name}-${var.environment}-public-subnet-1"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_subnet" "private_1" {
@@ -32,6 +42,10 @@ resource "aws_subnet" "private_1" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-subnet-1"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -44,6 +58,10 @@ resource "aws_subnet" "public_2" {
   tags = {
     Name = "${var.project_name}-${var.environment}-public-subnet-2"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_subnet" "private_2" {
@@ -54,6 +72,10 @@ resource "aws_subnet" "private_2" {
   tags = {
     Name = "${var.project_name}-${var.environment}-private-subnet-2"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_internet_gateway" "igw" {
@@ -61,6 +83,10 @@ resource "aws_internet_gateway" "igw" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-IGW"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -75,6 +101,10 @@ resource "aws_route_table" "public_route_table" {
   tags = {
     Name = "${var.project_name}-${var.environment}-public-RT"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_route_table" "private_route_table" {
@@ -82,6 +112,10 @@ resource "aws_route_table" "private_route_table" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-RT"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -105,6 +139,14 @@ resource "aws_route_table_association" "private_association_2" {
   route_table_id = aws_route_table.private_route_table.id
 }
 
+# initialize default security group with no rules to secure fallback
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-default-sg"
+  }
+}
 resource "aws_security_group" "rds_sg" {
   vpc_id = aws_vpc.main.id
   name   = "${var.project_name}-${var.environment}-rds-sg"
