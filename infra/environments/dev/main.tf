@@ -86,7 +86,7 @@ resource "aws_iam_role_policy_attachment" "lambda_secrets_attach" {
 
 resource "aws_iam_role_policy_attachment" "lambda_vpc_attach" {
   role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonLambdaVPCAccessExecutionRole"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
 module "lambda_ingestion" {
@@ -128,4 +128,23 @@ module "lambda_backend" {
     DB_PORT       = module.rds.port
     DB_SECRET_ARN = aws_secretsmanager_secret.db_credentials.arn
   }
+}
+
+module "api_gateway" {
+  source = "../../modules/api_gateway"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  lambda_invoke_arn = module.lambda_backend.invoke_arn
+  lambda_arn        = module.lambda_backend.arn
+}
+
+module "event_bridge" {
+  source = "../../modules/event_bridge"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  lambda_arn          = module.lambda_ingestion.arn
+  rule_name           = "daily-ingestion-rule"
+  schedule_expression = "cron(0 9 * * ? *)"
 }

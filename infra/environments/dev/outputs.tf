@@ -1,17 +1,12 @@
-# Outputs will be populated as modules are added in Stories 2.2 - 2.4.
-# Placeholders are defined here to establish the convention.
+output "rds_endpoint" {
+  description = "RDS PostgreSQL instance endpoint"
+  value       = module.rds.endpoint
+}
 
-# Example outputs (uncomment as modules are added):
-
-# output "rds_endpoint" {
-#   description = "RDS PostgreSQL instance endpoint"
-#   value       = module.rds.endpoint
-# }
-
-# output "api_gateway_url" {
-#   description = "API Gateway invoke URL"
-#   value       = module.api.invoke_url
-# }
+output "api_gateway_url" {
+  description = "API Gateway invoke URL."
+  value       = module.api_gateway.api_endpoint
+}
 
 # output "cloudfront_domain" {
 #   description = "CloudFront distribution domain for the frontend"
@@ -19,6 +14,6 @@
 # }
 
 output "db_secret_arn" {
-  description = "ARN of the Secrets Manager secret containing DB credentials"
+  description = "ARN of the Secrets Manager secret containing DB credentials."
   value       = aws_secretsmanager_secret.db_credentials.arn
 }
