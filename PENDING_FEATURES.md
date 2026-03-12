@@ -82,8 +82,6 @@ terraform destroy \
   -target=aws_s3_bucket_policy.s3-policy-frontend
 ```
 
-> > > > > > > Stashed changes
-
 ### Proposed Solution
 
 A shell script at `scripts/teardown.sh` that dynamically builds the `-target` list by querying Terraform state and excluding `module.vpc`:
