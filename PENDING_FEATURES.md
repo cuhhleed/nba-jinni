@@ -58,6 +58,27 @@ Identified during Story 2.3 when `terraform destroy` was taking 20+ minutes to c
 - `terraform destroy` errors on `prevent_destroy` resources — a targeted destroy is required for routine teardowns.
 - Manually maintaining a `-target` list is error-prone and becomes stale as new modules are added to the project.
 - The Secrets Manager 30-day recovery window causes redeployment failures if the secret is not force-deleted before recreating.
+- current workaround:
+
+```
+terraform destroy \
+  -target=aws_secretsmanager_secret.db_credentials \
+  -target=aws_secretsmanager_secret_version.db_credentials_secret \
+  -target=module.lambda_security_group \
+  -target=module.rds_security_group \
+  -target=module.rds \
+  -target=aws_iam_role.lambda_exec \
+  -target=aws_iam_policy.lambda_secrets \
+  -target=aws_iam_role_policy_attachment.lambda_secrets_attach \
+  -target=aws_iam_role_policy_attachment.lambda_vpc_attach \
+  -target=module.lambda_ingestion \
+  -target=module.lambda_backend \
+  -target=module.api_gateway \
+  -target=module.event_bridge \
+  -target=module.s3_frontend \
+  -target=module.cloudfront_frontend \
+  -target=aws_s3_bucket_policy.s3-policy-frontend
+```
 
 ### Proposed Solution
 

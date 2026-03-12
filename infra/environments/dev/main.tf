@@ -168,3 +168,47 @@ module "event_bridge" {
   rule_name           = "daily-ingestion-rule"
   schedule_expression = "cron(0 9 * * ? *)"
 }
+
+module "s3_frontend" {
+  source = "../../modules/s3"
+
+  project_name = var.project_name
+  environment  = var.environment
+  bucket_name  = "frontend"
+}
+
+module "cloudfront_frontend" {
+  source = "../../modules/cloudfront"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  origins           = [{ domain_name = module.s3_frontend.bucket_regional_domain_name, origin_id = module.s3_frontend.bucket_id }]
+  target_origin_id  = module.s3_frontend.bucket_id
+  oac_name          = "frontend-OAC"
+  distribution_name = "frontend_CFN"
+
+  allow_methods  = ["GET", "HEAD"]
+  cached_methods = ["GET", "HEAD"]
+}
+
+resource "aws_s3_bucket_policy" "s3-policy-frontend" {
+  bucket = module.s3_frontend.bucket_id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "AllowCloudFrontOAC"
+      Effect = "Allow"
+      Principal = {
+        Service = "cloudfront.amazonaws.com"
+      }
+      Action   = "s3:GetObject"
+      Resource = "${module.s3_frontend.bucket_arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = module.cloudfront_frontend.distribution_arn
+        }
+      }
+    }]
+  })
+}
+
