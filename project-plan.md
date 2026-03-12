@@ -8,19 +8,19 @@ A full-stack web application for viewing NBA player and team statistics, designe
 
 ## Confirmed Stack
 
-| Layer | Technology | Rationale |
-|---|---|---|
-| Frontend | React + TypeScript (Vite) | Industry-standard, portfolio-visible, type safety |
-| Backend API | Python + FastAPI | Shared language with ingestion, modern, auto-docs |
-| Database | PostgreSQL (AWS RDS) | Relational data fits the domain, industry gold standard |
-| Ingestion | Python Lambda + EventBridge | Serverless, free tier friendly, nightly schedule |
-| Hosting (FE) | S3 + CloudFront | Static hosting, effectively free |
-| Hosting (API) | Lambda + API Gateway | Serverless, free tier friendly |
-| IaC | Terraform | Cloud-agnostic, widely recognized |
-| CI/CD | GitHub Actions | Native to repo, employer visible, AWS OIDC integration |
-| Auth | JWT (email/password) | Simple, standard, no third-party dependency |
-| Migrations | Alembic | Python-native, pairs with SQLAlchemy |
-| Repo Structure | Monorepo | Solo project, single pipeline, clean folder separation |
+| Layer          | Technology                  | Rationale                                               |
+| -------------- | --------------------------- | ------------------------------------------------------- |
+| Frontend       | React + TypeScript (Vite)   | Industry-standard, portfolio-visible, type safety       |
+| Backend API    | Python + FastAPI            | Shared language with ingestion, modern, auto-docs       |
+| Database       | PostgreSQL (AWS RDS)        | Relational data fits the domain, industry gold standard |
+| Ingestion      | Python Lambda + EventBridge | Serverless, free tier friendly, nightly schedule        |
+| Hosting (FE)   | S3 + CloudFront             | Static hosting, effectively free                        |
+| Hosting (API)  | Lambda + API Gateway        | Serverless, free tier friendly                          |
+| IaC            | Terraform                   | Cloud-agnostic, widely recognized                       |
+| CI/CD          | GitHub Actions              | Native to repo, employer visible, AWS OIDC integration  |
+| Auth           | JWT (email/password)        | Simple, standard, no third-party dependency             |
+| Migrations     | Alembic                     | Python-native, pairs with SQLAlchemy                    |
+| Repo Structure | Monorepo                    | Solo project, single pipeline, clean folder separation  |
 
 ---
 
@@ -46,13 +46,16 @@ A full-stack web application for viewing NBA player and team statistics, designe
 ## Data Architecture Notes
 
 ### API Constraint Strategy
+
 The free tier of api-sports.io allows **100 calls per 24 hours**. The ingestion pipeline must be designed to maximize data extracted per call:
+
 - Fetch game logs by date range rather than game-by-game
 - Prioritize endpoints that return bulk player stats in a single response
 - Cache reference data (teams, rosters) and only re-fetch on a weekly basis, not nightly
 - Nightly job should focus only on games played in the last 24 hours
 
 ### Schema Design (Core Entities)
+
 ```
 teams           — id, name, abbreviation, conference, division
 players         — id, name, team_id, position, jersey_number, active
@@ -80,27 +83,29 @@ This schema directly supports every required stat view and is extensible to othe
 ---
 
 **Story 1.1 — Initialize monorepo**
-*As a developer, I want a clean repository structure so that all parts of the project are logically organized and easy to navigate.*
+_As a developer, I want a clean repository structure so that all parts of the project are logically organized and easy to navigate._
 
 Tasks:
-- [ ] Create GitHub repository (public, for portfolio visibility)
-- [ ] Initialize monorepo folder structure: `/frontend`, `/backend`, `/ingestion`, `/infra`, `/.github/workflows`
-- [ ] Add root-level `README.md` with project description, stack overview, architecture diagram placeholder, and local dev setup instructions
-- [ ] Add `.gitignore` covering Python, Node, Terraform, and environment files
-- [ ] Configure branch protection on `main` (require PR, no direct push)
-- [ ] Create a `dev` branch as the primary working branch
+
+- [x] Create GitHub repository (public, for portfolio visibility)
+- [x] Initialize monorepo folder structure: `/frontend`, `/backend`, `/ingestion`, `/infra`, `/.github/workflows`
+- [x] Add root-level `README.md` with project description, stack overview, architecture diagram placeholder, and local dev setup instructions
+- [x] Add `.gitignore` covering Python, Node, Terraform, and environment files
+- [x] Configure branch protection on `main` (require PR, no direct push)
+- [x] Create a `dev` branch as the primary working branch
 
 ---
 
 **Story 1.2 — Configure local development environment**
-*As a developer, I want consistent local dev tooling so that linting and formatting are enforced from day one.*
+_As a developer, I want consistent local dev tooling so that linting and formatting are enforced from day one._
 
 Tasks:
-- [ ] Add `pyproject.toml` for backend and ingestion with `black`, `flake8`, and `isort` config
-- [ ] Add `.pre-commit-config.yaml` for pre-commit hooks (format + lint on commit)
-- [ ] Add `package.json` ESLint + Prettier config for frontend
-- [ ] Add a root-level `Makefile` with common commands (`make dev`, `make test`, `make lint`)
-- [ ] Document local setup steps in README
+
+- [x] Add `pyproject.toml` for backend and ingestion with `black`, `flake8`, and `isort` config
+- [x] Add `.pre-commit-config.yaml` for pre-commit hooks (format + lint on commit)
+- [x] Add `package.json` ESLint + Prettier config for frontend
+- [x] Add a root-level `Makefile` with common commands (`make dev`, `make test`, `make lint`)
+- [x] Document local setup steps in README
 
 ---
 
@@ -111,46 +116,50 @@ Tasks:
 ---
 
 **Story 2.1 — Terraform project structure and remote state**
-*As a developer, I want Terraform state stored remotely so that infrastructure changes are tracked and safe.*
+_As a developer, I want Terraform state stored remotely so that infrastructure changes are tracked and safe._
 
 Tasks:
-- [ ] Initialize Terraform project under `/infra` with `modules/` and `environments/dev/` structure
-- [ ] Manually create an S3 bucket and DynamoDB table for Terraform remote state (one-time bootstrap)
-- [ ] Configure `backend.tf` in `environments/dev/` to use the remote state bucket
-- [ ] Define `variables.tf` and `outputs.tf` conventions for all modules
-- [ ] Add `terraform fmt` and `terraform validate` to CI pipeline (later epic)
+
+- [x] Initialize Terraform project under `/infra` with `modules/` and `environments/dev/` structure
+- [x] Manually create an S3 bucket and DynamoDB table for Terraform remote state (one-time bootstrap)
+- [x] Configure `backend.tf` in `environments/dev/` to use the remote state bucket
+- [x] Define `variables.tf` and `outputs.tf` conventions for all modules
+- [x] Add `terraform fmt` and `terraform validate` to CI pipeline (later epic)
 
 ---
 
 **Story 2.2 — Provision database infrastructure**
-*As a developer, I want an RDS PostgreSQL instance provisioned via Terraform so the database is reproducible and secured.*
+_As a developer, I want an RDS PostgreSQL instance provisioned via Terraform so the database is reproducible and secured._
 
 Tasks:
-- [ ] Write Terraform `rds` module: `db.t3.micro`, PostgreSQL 15, free tier settings
-- [ ] Place RDS in a private subnet (no public access)
-- [ ] Create a VPC, public/private subnets, and security groups to allow Lambda → RDS access
-- [ ] Store DB credentials in AWS Secrets Manager via Terraform
-- [ ] Output RDS endpoint for use in other modules
+
+- [x] Write Terraform `rds` module: `db.t3.micro`, PostgreSQL 15, free tier settings
+- [x] Place RDS in a private subnet (no public access)
+- [x] Create a VPC, public/private subnets, and security groups to allow Lambda → RDS access
+- [x] Store DB credentials in AWS Secrets Manager via Terraform
+- [x ] Output RDS endpoint for use in other modules
 
 ---
 
 **Story 2.3 — Provision compute and API infrastructure**
-*As a developer, I want Lambda functions and API Gateway provisioned via Terraform so the backend is deployable without manual console work.*
+_As a developer, I want Lambda functions and API Gateway provisioned via Terraform so the backend is deployable without manual console work._
 
 Tasks:
-- [ ] Write Terraform `lambda` module for the backend API function (Python 3.12 runtime)
-- [ ] Write Terraform `lambda` module for the ingestion function (separate function)
-- [ ] Write Terraform for API Gateway (HTTP API) wired to the backend Lambda
-- [ ] Write Terraform for EventBridge rule (nightly cron) triggering the ingestion Lambda
-- [ ] Configure IAM roles: Lambda execution role with RDS access and Secrets Manager read
-- [ ] Configure Lambda VPC settings so it can reach RDS in the private subnet
+
+- [x] Write Terraform `lambda` module for the backend API function (Python 3.12 runtime)
+- [x] Write Terraform `lambda` module for the ingestion function (separate function)
+- [x] Write Terraform for API Gateway (HTTP API) wired to the backend Lambda
+- [x] Write Terraform for EventBridge rule (nightly cron) triggering the ingestion Lambda
+- [x] Configure IAM roles: Lambda execution role with RDS access and Secrets Manager read
+- [x] Configure Lambda VPC settings so it can reach RDS in the private subnet
 
 ---
 
 **Story 2.4 — Provision frontend hosting infrastructure**
-*As a developer, I want the frontend hosted on S3 + CloudFront so it is publicly accessible and delivered via CDN.*
+_As a developer, I want the frontend hosted on S3 + CloudFront so it is publicly accessible and delivered via CDN._
 
 Tasks:
+
 - [ ] Write Terraform for S3 bucket (static website hosting, public read policy)
 - [ ] Write Terraform for CloudFront distribution pointing to the S3 bucket
 - [ ] Configure CloudFront to handle SPA routing (redirect 404s to `index.html`)
@@ -165,9 +174,10 @@ Tasks:
 ---
 
 **Story 3.1 — Set up Alembic migration framework**
-*As a developer, I want a migration framework in place so that database schema changes are versioned and repeatable.*
+_As a developer, I want a migration framework in place so that database schema changes are versioned and repeatable._
 
 Tasks:
+
 - [ ] Install and initialize Alembic in the `/backend` project
 - [ ] Configure Alembic to connect to the RDS instance via environment variable
 - [ ] Document how to run migrations (`alembic upgrade head`) in the README
@@ -176,9 +186,10 @@ Tasks:
 ---
 
 **Story 3.2 — Implement core schema migrations**
-*As a developer, I want the full database schema created via migrations so that the data layer is ready for the ingestion pipeline.*
+_As a developer, I want the full database schema created via migrations so that the data layer is ready for the ingestion pipeline._
 
 Tasks:
+
 - [ ] Write migration: `teams` table
 - [ ] Write migration: `seasons` table
 - [ ] Write migration: `players` table (FK to teams)
@@ -192,9 +203,10 @@ Tasks:
 ---
 
 **Story 3.3 — Seed reference data**
-*As a developer, I want static reference data (teams, current season) pre-loaded so the ingestion pipeline has the context it needs.*
+_As a developer, I want static reference data (teams, current season) pre-loaded so the ingestion pipeline has the context it needs._
 
 Tasks:
+
 - [ ] Write a one-time seed script for all 30 NBA teams
 - [ ] Write a one-time seed script for the current season record
 - [ ] Document how to run seed scripts in the README
@@ -208,9 +220,10 @@ Tasks:
 ---
 
 **Story 4.1 — API client and rate limit management**
-*As a developer, I want a well-designed API client so that all calls to api-sports.io are tracked, logged, and never wasted.*
+_As a developer, I want a well-designed API client so that all calls to api-sports.io are tracked, logged, and never wasted._
 
 Tasks:
+
 - [ ] Read and document the api-sports.io NBA endpoint reference — identify the minimum set of endpoints needed for all stat views
 - [ ] Implement a Python API client class wrapping `httpx` with: API key injection from Secrets Manager, response logging, error handling, and retry logic
 - [ ] Implement a call counter utility that logs each API call to a DynamoDB table (or CloudWatch metric) so daily usage is trackable
@@ -219,9 +232,10 @@ Tasks:
 ---
 
 **Story 4.2 — Roster and reference data ingestion**
-*As a developer, I want team rosters kept up to date so the database always reflects the current league.*
+_As a developer, I want team rosters kept up to date so the database always reflects the current league._
 
 Tasks:
+
 - [ ] Implement ingestion function: fetch all players for each team and upsert into `players` table
 - [ ] Schedule this function to run **weekly** (not nightly) to conserve API calls
 - [ ] Implement idempotent upsert logic (insert if not exists, update if changed)
@@ -229,9 +243,10 @@ Tasks:
 ---
 
 **Story 4.3 — Game and player stats ingestion**
-*As a developer, I want last night's game stats automatically ingested so the database stays current without manual intervention.*
+_As a developer, I want last night's game stats automatically ingested so the database stays current without manual intervention._
 
 Tasks:
+
 - [ ] Implement nightly ingestion function: fetch all games played in the last 24 hours
 - [ ] For each completed game, fetch player stats and upsert into `player_game_stats`
 - [ ] Derive and upsert updated `player_season_averages` from the raw game stats (compute locally — do not use an extra API call)
@@ -241,9 +256,10 @@ Tasks:
 ---
 
 **Story 4.4 — Lambda packaging and deployment**
-*As a developer, I want the ingestion Lambda packaged and deployable via CI so it runs reliably in AWS.*
+_As a developer, I want the ingestion Lambda packaged and deployable via CI so it runs reliably in AWS._
 
 Tasks:
+
 - [ ] Configure Lambda handler entry point
 - [ ] Set up dependency packaging (Lambda layer or bundled zip)
 - [ ] Verify Lambda can connect to RDS inside the VPC
@@ -259,9 +275,10 @@ Tasks:
 ---
 
 **Story 5.1 — Project structure and database connectivity**
-*As a developer, I want a clean FastAPI project wired up to PostgreSQL so I have a solid foundation for building endpoints.*
+_As a developer, I want a clean FastAPI project wired up to PostgreSQL so I have a solid foundation for building endpoints._
 
 Tasks:
+
 - [ ] Initialize FastAPI project under `/backend`
 - [ ] Configure SQLAlchemy async engine with connection pooling
 - [ ] Set up dependency injection pattern for DB sessions
@@ -272,9 +289,10 @@ Tasks:
 ---
 
 **Story 5.2 — Authentication**
-*As a user, I want to register and log in with email and password so my session is secure.*
+_As a user, I want to register and log in with email and password so my session is secure._
 
 Tasks:
+
 - [ ] Implement `POST /auth/register` — hash password with bcrypt, insert user, return JWT
 - [ ] Implement `POST /auth/login` — verify password, return JWT
 - [ ] Implement JWT middleware for protected routes
@@ -283,9 +301,10 @@ Tasks:
 ---
 
 **Story 5.3 — Player and team endpoints**
-*As a user, I want to search for players and browse teams so I can navigate to the stats I need.*
+_As a user, I want to search for players and browse teams so I can navigate to the stats I need._
 
 Tasks:
+
 - [ ] Implement `GET /teams` — return all teams
 - [ ] Implement `GET /teams/{team_id}/roster` — return players on a team
 - [ ] Implement `GET /players/search?q=` — search players by name
@@ -294,9 +313,10 @@ Tasks:
 ---
 
 **Story 5.4 — Stats endpoints**
-*As a user, I want to view a variety of stat views for any player so I can assess their likely performance.*
+_As a user, I want to view a variety of stat views for any player so I can assess their likely performance._
 
 Tasks:
+
 - [ ] Implement `GET /players/{player_id}/season-averages` — current season averages
 - [ ] Implement `GET /players/{player_id}/last-5-games` — last 5 game logs
 - [ ] Implement `GET /players/{player_id}/vs-opponent?team_id=` — historical stats vs a specific team
@@ -314,9 +334,10 @@ Tasks:
 ---
 
 **Story 6.1 — Project setup and routing**
-*As a developer, I want the frontend scaffolded with routing and a global state foundation before building any views.*
+_As a developer, I want the frontend scaffolded with routing and a global state foundation before building any views._
 
 Tasks:
+
 - [ ] Initialize Vite + React + TypeScript project under `/frontend`
 - [ ] Install and configure React Router (v6) for multi-view navigation
 - [ ] Install and configure React Query for server state management
@@ -327,9 +348,10 @@ Tasks:
 ---
 
 **Story 6.2 — Authentication views**
-*As a user, I want to register and log in so I can access the app.*
+_As a user, I want to register and log in so I can access the app._
 
 Tasks:
+
 - [ ] Build `/login` page — form, API call, store JWT, redirect on success
 - [ ] Build `/register` page — form, API call, redirect to login on success
 - [ ] Implement auth context (global user/token state)
@@ -339,9 +361,10 @@ Tasks:
 ---
 
 **Story 6.3 — Team browser and player navigation**
-*As a user, I want to browse teams and drill into their rosters so I can find the player I'm looking for.*
+_As a user, I want to browse teams and drill into their rosters so I can find the player I'm looking for._
 
 Tasks:
+
 - [ ] Build `/teams` page — grid of all 30 teams with logos/names
 - [ ] Build `/teams/{id}` page — team detail with roster list
 - [ ] Build global player search bar in the nav — autocomplete calling `/players/search`
@@ -350,9 +373,10 @@ Tasks:
 ---
 
 **Story 6.4 — Player detail and stat views**
-*As a user, I want a rich player detail page where I can toggle between different stat views.*
+_As a user, I want a rich player detail page where I can toggle between different stat views._
 
 Tasks:
+
 - [ ] Build `/players/{id}` page — player header (name, team, position, injury badge)
 - [ ] Build tabbed stat view component with tabs for: Season Averages, Last 5 Games, vs Opponent, vs Matchup
 - [ ] Build season averages stat card
@@ -364,9 +388,10 @@ Tasks:
 ---
 
 **Story 6.5 — Player comparison view**
-*As a user, I want to compare two or more players side-by-side so I can evaluate relative performance.*
+_As a user, I want to compare two or more players side-by-side so I can evaluate relative performance._
 
 Tasks:
+
 - [ ] Build `/compare` page — player selector (add up to 4 players)
 - [ ] Build side-by-side stat comparison table
 - [ ] Highlight best value per stat row
@@ -374,9 +399,10 @@ Tasks:
 ---
 
 **Story 6.6 — Dashboard**
-*As a user, I want a home dashboard so I have a useful landing page when I log in.*
+_As a user, I want a home dashboard so I have a useful landing page when I log in._
 
 Tasks:
+
 - [ ] Build `/dashboard` — today's game schedule with participating teams
 - [ ] Add a "players to watch" section (players with games today)
 - [ ] Add quick-access links to recently viewed players (stored in local state)
@@ -390,9 +416,10 @@ Tasks:
 ---
 
 **Story 7.1 — AWS authentication via OIDC**
-*As a developer, I want GitHub Actions to authenticate with AWS without storing long-lived credentials so the pipeline is secure.*
+_As a developer, I want GitHub Actions to authenticate with AWS without storing long-lived credentials so the pipeline is secure._
 
 Tasks:
+
 - [ ] Create an OIDC identity provider in AWS IAM for GitHub Actions
 - [ ] Create an IAM role with appropriate permissions (Lambda deploy, S3 sync, CloudFront invalidation) and trust policy scoped to this repository
 - [ ] Add the IAM role ARN as a GitHub Actions secret (`AWS_ROLE_ARN`)
@@ -401,9 +428,10 @@ Tasks:
 ---
 
 **Story 7.2 — Terraform CI workflow**
-*As a developer, I want Terraform plan run on every PR and apply run on merge to main so infrastructure changes are reviewed before applying.*
+_As a developer, I want Terraform plan run on every PR and apply run on merge to main so infrastructure changes are reviewed before applying._
 
 Tasks:
+
 - [ ] Create `.github/workflows/terraform.yml`
 - [ ] On PR: run `terraform fmt`, `terraform validate`, `terraform plan` — post plan output as PR comment
 - [ ] On merge to `main`: run `terraform apply -auto-approve`
@@ -412,9 +440,10 @@ Tasks:
 ---
 
 **Story 7.3 — Backend API CI/CD workflow**
-*As a developer, I want the backend automatically tested and deployed to Lambda on every merge to main.*
+_As a developer, I want the backend automatically tested and deployed to Lambda on every merge to main._
 
 Tasks:
+
 - [ ] Create `.github/workflows/backend.yml`
 - [ ] On PR: run `flake8`, `black --check`, and `pytest`
 - [ ] On merge to `main`: package Lambda zip, run `alembic upgrade head` against RDS, deploy zip to Lambda via AWS CLI
@@ -423,9 +452,10 @@ Tasks:
 ---
 
 **Story 7.4 — Frontend CI/CD workflow**
-*As a developer, I want the frontend automatically built and deployed to S3/CloudFront on every merge to main.*
+_As a developer, I want the frontend automatically built and deployed to S3/CloudFront on every merge to main._
 
 Tasks:
+
 - [ ] Create `.github/workflows/frontend.yml`
 - [ ] On PR: run `eslint`, `tsc --noEmit` (type check), `npm run build`
 - [ ] On merge to `main`: run build, sync dist output to S3 bucket, create CloudFront invalidation
@@ -440,9 +470,10 @@ Tasks:
 ---
 
 **Story 8.1 — End-to-end verification**
-*As a developer, I want to verify that data flows correctly from the API through the database to the frontend before calling the app done.*
+_As a developer, I want to verify that data flows correctly from the API through the database to the frontend before calling the app done._
 
 Tasks:
+
 - [ ] Trigger ingestion Lambda manually and verify data lands in RDS
 - [ ] Call each backend API endpoint via the deployed API Gateway URL and verify correct responses
 - [ ] Open the deployed frontend and exercise every view end-to-end
@@ -451,9 +482,10 @@ Tasks:
 ---
 
 **Story 8.2 — Security hardening**
-*As a developer, I want the application secured against basic threats before making it public.*
+_As a developer, I want the application secured against basic threats before making it public._
 
 Tasks:
+
 - [ ] Ensure no secrets are hardcoded — all credentials via Secrets Manager or environment variables
 - [ ] Add rate limiting to the FastAPI backend (via `slowapi`)
 - [ ] Confirm RDS has no public inbound access (VPC only)
@@ -463,9 +495,10 @@ Tasks:
 ---
 
 **Story 8.3 — Final documentation**
-*As a developer, I want comprehensive documentation so that anyone viewing the repository understands the project immediately.*
+_As a developer, I want comprehensive documentation so that anyone viewing the repository understands the project immediately._
 
 Tasks:
+
 - [ ] Write final `README.md` with: project summary, architecture diagram, full tech stack table, local dev setup guide, deployment guide, and API endpoint reference
 - [ ] Add architecture diagram (draw.io or Excalidraw — export as PNG, commit to repo)
 - [ ] Add screenshots of the running frontend to the README
@@ -475,30 +508,29 @@ Tasks:
 
 ## Suggested Sprint Breakdown (1–3 Month Pace)
 
-| Sprint | Duration | Focus |
-|---|---|---|
-| Sprint 1 | Week 1–2 | Epic 1 (Foundation) + Epic 2 (Terraform infrastructure) |
-| Sprint 2 | Week 3–4 | Epic 3 (Schema + Migrations) + Epic 4 (Ingestion pipeline) |
-| Sprint 3 | Week 5–6 | Epic 5 (Backend API — auth + all endpoints) |
-| Sprint 4 | Week 7–9 | Epic 6 (Frontend — all views) |
-| Sprint 5 | Week 10–11 | Epic 7 (CI/CD pipeline) |
-| Sprint 6 | Week 12 | Epic 8 (Integration, hardening, documentation) |
+| Sprint   | Duration   | Focus                                                      |
+| -------- | ---------- | ---------------------------------------------------------- |
+| Sprint 1 | Week 1–2   | Epic 1 (Foundation) + Epic 2 (Terraform infrastructure)    |
+| Sprint 2 | Week 3–4   | Epic 3 (Schema + Migrations) + Epic 4 (Ingestion pipeline) |
+| Sprint 3 | Week 5–6   | Epic 5 (Backend API — auth + all endpoints)                |
+| Sprint 4 | Week 7–9   | Epic 6 (Frontend — all views)                              |
+| Sprint 5 | Week 10–11 | Epic 7 (CI/CD pipeline)                                    |
+| Sprint 6 | Week 12    | Epic 8 (Integration, hardening, documentation)             |
 
 ---
 
 ## Key Technical Decisions Log
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Frontend framework | React + TypeScript | Most employer-recognizable; TypeScript signals maturity |
-| Backend language | Python + FastAPI | Shared with ingestion; modern, fast, auto-docs |
-| Database | PostgreSQL (RDS) | Relational model fits domain; industry standard |
-| ORM | SQLAlchemy + Alembic | Python standard; migration workflow is a portfolio skill |
-| Auth | JWT (custom) | No external dependency; demonstrates understanding of auth fundamentals |
-| API compute | Lambda + API Gateway | Free tier; serverless pattern worth knowing |
-| Frontend hosting | S3 + CloudFront | Effectively free; standard static hosting pattern |
-| IaC | Terraform | Cloud-agnostic; widely recognized across employers |
-| CI/CD | GitHub Actions | Lives in repo; OIDC AWS auth; highly visible to employers |
-| Repo structure | Monorepo | Solo project; reduces friction; unified CI/CD |
-| Data freshness | Nightly Lambda (EventBridge) | Fits API call budget; serverless; clean pattern |
-
+| Decision           | Choice                       | Rationale                                                               |
+| ------------------ | ---------------------------- | ----------------------------------------------------------------------- |
+| Frontend framework | React + TypeScript           | Most employer-recognizable; TypeScript signals maturity                 |
+| Backend language   | Python + FastAPI             | Shared with ingestion; modern, fast, auto-docs                          |
+| Database           | PostgreSQL (RDS)             | Relational model fits domain; industry standard                         |
+| ORM                | SQLAlchemy + Alembic         | Python standard; migration workflow is a portfolio skill                |
+| Auth               | JWT (custom)                 | No external dependency; demonstrates understanding of auth fundamentals |
+| API compute        | Lambda + API Gateway         | Free tier; serverless pattern worth knowing                             |
+| Frontend hosting   | S3 + CloudFront              | Effectively free; standard static hosting pattern                       |
+| IaC                | Terraform                    | Cloud-agnostic; widely recognized across employers                      |
+| CI/CD              | GitHub Actions               | Lives in repo; OIDC AWS auth; highly visible to employers               |
+| Repo structure     | Monorepo                     | Solo project; reduces friction; unified CI/CD                           |
+| Data freshness     | Nightly Lambda (EventBridge) | Fits API call budget; serverless; clean pattern                         |

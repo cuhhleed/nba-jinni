@@ -4,7 +4,7 @@ This document tracks features, refactors, and architectural improvements that ha
 
 ---
 
-## FEATURE-001 — Security Group Module Extraction
+## FEATURE-001 — Security Group Module Extraction — **COMPLETE**
 
 ### Status
 
@@ -34,11 +34,11 @@ Create a dedicated `modules/security_groups/` module that is entirely generic �
 
 ### Tasks
 
-- [ ] Create generic `modules/security_groups/` module — accepts vpc_id, project_name, environment, and ingress/egress rule configuration, outputs a single security group ID
-- [ ] Remove `lambda_sg` and `rds_sg` from `modules/vpc/main.tf` and their outputs from `modules/vpc/outputs.tf`
-- [ ] Instantiate the module twice in `environments/dev/main.tf` for Lambda and RDS respectively, wiring outputs to the appropriate compute modules
-- [ ] Update teardown script to exclude `module.vpc` only — security groups are destroyed as part of normal targeted teardown
-- [ ] Verify plan, apply, and targeted destroy work correctly end-to-end
+- [x] Create generic `modules/security_groups/` module — accepts vpc_id, project_name, environment, and ingress/egress rule configuration, outputs a single security group ID
+- [x] Remove `lambda_sg` and `rds_sg` from `modules/vpc/main.tf` and their outputs from `modules/vpc/outputs.tf`
+- [x] Instantiate the module twice in `environments/dev/main.tf` for Lambda and RDS respectively, wiring outputs to the appropriate compute modules
+- [x] Update teardown script to exclude `module.vpc` only — security groups are destroyed as part of normal targeted teardown
+- [x] Verify plan, apply, and targeted destroy work correctly end-to-end
 
 ---
 
