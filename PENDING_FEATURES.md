@@ -42,7 +42,7 @@ Create a dedicated `modules/security_groups/` module that is entirely generic �
 
 ---
 
-## FEATURE-002 — Dynamic Teardown Script
+## FEATURE-002 — Dynamic Teardown Script — **COMPLETE**
 
 ### Status
 
@@ -58,7 +58,9 @@ Identified during Story 2.3 when `terraform destroy` was taking 20+ minutes to c
 - `terraform destroy` errors on `prevent_destroy` resources — a targeted destroy is required for routine teardowns.
 - Manually maintaining a `-target` list is error-prone and becomes stale as new modules are added to the project.
 - The Secrets Manager 30-day recovery window causes redeployment failures if the secret is not force-deleted before recreating.
-- current workaround:
+  <<<<<<< Updated upstream
+  =======
+- Current workaround:
 
 ```
 terraform destroy \
@@ -93,7 +95,7 @@ This is self-maintaining — new modules are automatically included without any 
 
 ### Tasks
 
-- [ ] Create `scripts/teardown.sh` — dynamically build `-target` list from state, exclude `module.vpc`, force-delete Secrets Manager secret, run `terraform destroy`
-- [ ] Document usage in README
+- [x] Create `scripts/teardown.sh` — dynamically build `-target` list from state, exclude `module.vpc`, force-delete Secrets Manager secret, run `terraform destroy`
+- [x] Document usage in README
 
 ---

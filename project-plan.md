@@ -160,10 +160,10 @@ _As a developer, I want the frontend hosted on S3 + CloudFront so it is publicly
 
 Tasks:
 
-- [ ] Write Terraform for S3 bucket (static website hosting, public read policy)
-- [ ] Write Terraform for CloudFront distribution pointing to the S3 bucket
-- [ ] Configure CloudFront to handle SPA routing (redirect 404s to `index.html`)
-- [ ] Output CloudFront domain URL
+- [x] Write Terraform for S3 bucket (static website hosting, public read policy)
+- [x] Write Terraform for CloudFront distribution pointing to the S3 bucket
+- [x] Configure CloudFront to handle SPA routing (redirect 404s to `index.html`)
+- [x] Output CloudFront domain URL
 
 ---
 
