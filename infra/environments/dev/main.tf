@@ -46,6 +46,26 @@ module "vpc" {
   environment  = var.environment
 }
 
+module "lambda_security_group" {
+  source = "../../modules/security_groups"
+
+  project_name = var.project_name
+  environment  = var.environment
+  sg_name      = "lambda_sg"
+  vpc_id       = module.vpc.vpc_id
+  egress_rules = [{ from_port = 5432 }, { from_port = 443 }]
+}
+module "rds_security_group" {
+  source = "../../modules/security_groups"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  sg_name       = "rds_sg"
+  vpc_id        = module.vpc.vpc_id
+  ingress_rules = [{ from_port = 5432, security_groups = [module.lambda_security_group.security_group_id] }]
+  egress_rules  = [{ from_port = 0, protocol = "-1" }]
+}
+
 module "rds" {
   source = "../../modules/rds"
 
@@ -53,7 +73,7 @@ module "rds" {
   environment       = var.environment
   vpc_id            = module.vpc.vpc_id
   subnet_ids        = module.vpc.private_subnet_ids
-  security_group_id = module.vpc.rds_sg_id
+  security_group_id = module.rds_security_group.security_group_id
   username          = var.db_username
   password          = var.db_password
 }
@@ -100,7 +120,7 @@ module "lambda_ingestion" {
   handler            = "main.handler"
   timeout            = 300
   subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.vpc.lambda_sg_id]
+  security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
     DB_HOST       = module.rds.endpoint
@@ -120,7 +140,7 @@ module "lambda_backend" {
   role               = aws_iam_role.lambda_exec.arn
   handler            = "main.handler"
   subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.vpc.lambda_sg_id]
+  security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
     DB_HOST       = module.rds.endpoint
