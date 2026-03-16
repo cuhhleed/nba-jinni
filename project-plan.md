@@ -178,10 +178,10 @@ _As a developer, I want a migration framework in place so that database schema c
 
 Tasks:
 
-- [ ] Install and initialize Alembic in the `/backend` project
-- [ ] Configure Alembic to connect to the RDS instance via environment variable
-- [ ] Document how to run migrations (`alembic upgrade head`) in the README
-- [ ] Set up `alembic upgrade head` as a step in the deployment pipeline (later epic)
+- [x] Install and initialize Alembic in the `/backend` project
+- [x] Configure Alembic to connect to the RDS instance via environment variable
+- [x] Document how to run migrations (`alembic upgrade head`) in the README
+- [x] Set up `alembic upgrade head` as a step in the deployment pipeline (later epic)
 
 ---
 
