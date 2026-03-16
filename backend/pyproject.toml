@@ -1,9 +1,9 @@
 [tool.poetry]
+package-mode = false
 name = "nbajinni-backend"
 version = "0.1.0"
 description = "NBAJinni FastAPI backend API"
 authors = ["Your Name <you@example.com>"]
-python = "^3.12"
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -17,6 +17,7 @@ pydantic-settings = "^2.3.0"
 passlib = { extras = ["bcrypt"], version = "^1.7.4" }
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 python-multipart = "^0.0.9"
+python-dotenv = "^1.0.0"
 slowapi = "^0.1.9"
 boto3 = "^1.34.0"
 uvicorn = { extras = ["standard"], version = "^0.30.0" }
