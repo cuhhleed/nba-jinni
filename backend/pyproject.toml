@@ -21,6 +21,7 @@ python-dotenv = "^1.0.0"
 slowapi = "^0.1.9"
 boto3 = "^1.34.0"
 uvicorn = { extras = ["standard"], version = "^0.30.0" }
+nbajinni-shared = { path = "../shared", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"

@@ -2,7 +2,7 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy import ForeignKey
 from sqlalchemy import Numeric
-from app.db.base import Base
+from nbajinni_shared.base import Base
 
 class PlayerSeasonAverage(Base):
     __tablename__ = "player_season_averages"

@@ -1,0 +1,10 @@
+[tool.poetry]
+name = "nbajinni-shared"
+version = "0.1.0"
+description = "Shared models and database base for NBAJinni"
+authors = ["Your Name <you@example.com>"]
+package-mode = true
+
+[tool.poetry.dependencies]
+python = "^3.12"
+sqlalchemy = { extras = ["asyncio"], version = "^2.0.0" }

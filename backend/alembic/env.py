@@ -11,8 +11,8 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from app.db.base import Base
-import app.models
+from nbajinni_shared.base import Base
+import nbajinni_shared.models
 
 
 
@@ -21,9 +21,6 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Wire up metadata here once models are defined
-# from app.db.base import Base
-# target_metadata = Base.metadata
 target_metadata = Base.metadata
 
 def get_url() -> str:

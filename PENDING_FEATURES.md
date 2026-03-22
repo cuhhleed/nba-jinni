@@ -99,3 +99,43 @@ This is self-maintaining — new modules are automatically included without any 
 - [x] Document usage in README
 
 ---
+
+## FEATURE-003 — Shared Models Package
+
+### Status
+
+Pending
+
+### Background
+
+Identified during Epic 3 development when seed scripts in the `/ingestion` package needed access to SQLAlchemy models defined in `/backend`. Both packages currently maintain separate model definitions, violating the single source of truth principle.
+
+### Problem
+
+- SQLAlchemy models are defined in `backend/app/models/` but are needed by the ingestion pipeline and seed scripts
+- Duplicating models across packages means schema changes must be applied in multiple places — a maintenance burden and a source of drift
+- The `DeclarativeBase` in `backend/app/db/base.py` is tightly coupled to the backend package, making it inaccessible to other packages
+- As the project grows, any new consumer of the models (e.g. data analysis scripts, admin tools) would face the same duplication problem
+
+### Constraints
+
+- Both `backend` and `ingestion` have separate `pyproject.toml` files and are independently deployable — the shared package must not introduce tight coupling between them
+- The backend's `alembic/env.py` imports `Base` and all models — these imports must be updated to reference the shared package without breaking migrations
+- The refactor must not break existing migration history or require schema changes
+
+### Proposed Solution
+
+Create a dedicated `/shared` package containing the `DeclarativeBase` and all SQLAlchemy models. Both `backend` and `ingestion` declare it as a local path dependency in their `pyproject.toml` using Poetry's editable install feature. This keeps models as a single source of truth while preserving the independent deployability of each package.
+
+### Tasks
+
+- [ ] Create `/shared` package with `pyproject.toml` and `nbajinni_shared/` module structure
+- [ ] Move `DeclarativeBase` from `backend/app/db/base.py` to `shared/nbajinni_shared/base.py`
+- [ ] Move all models from `backend/app/models/` to `shared/nbajinni_shared/models/`
+- [ ] Add `nbajinni-shared` as a local path dependency in `backend/pyproject.toml` and `ingestion/pyproject.toml`
+- [ ] Update `backend/alembic/env.py` imports to reference shared package
+- [ ] Update all backend imports that reference `app.models` or `app.db.base` to reference `nbajinni_shared`
+- [ ] Verify migrations still run correctly after refactor
+- [ ] Verify ingestion seed scripts can import models from shared package
+
+---

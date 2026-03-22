@@ -190,15 +190,15 @@ _As a developer, I want the full database schema created via migrations so that 
 
 Tasks:
 
-- [ ] Write migration: `teams` table
-- [ ] Write migration: `seasons` table
-- [ ] Write migration: `players` table (FK to teams)
-- [ ] Write migration: `games` table (FK to teams and seasons)
-- [ ] Write migration: `player_game_stats` table (FK to players and games)
-- [ ] Write migration: `player_season_averages` table (FK to players and seasons)
-- [ ] Write migration: `injuries` table (FK to players)
-- [ ] Write migration: `users` table
-- [ ] Add appropriate indexes: `player_id`, `game_id`, `team_id`, `date` columns
+- [x] Write migration: `teams` table
+- [x] Write migration: `seasons` table
+- [x] Write migration: `players` table (FK to teams)
+- [x] Write migration: `games` table (FK to teams and seasons)
+- [x] Write migration: `player_game_stats` table (FK to players and games)
+- [x] Write migration: `player_season_averages` table (FK to players and seasons)
+- [x] Write migration: `injuries` table (FK to players)
+- [x] Write migration: `users` table
+- [x] Add appropriate indexes: `player_id`, `game_id`, `team_id`, `date` columns
 
 ---
 

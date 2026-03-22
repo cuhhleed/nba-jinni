@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy import UUID
-from app.db.base import Base
+from nbajinni_shared.base import Base
 import uuid
 from datetime import datetime
 from sqlalchemy import func
