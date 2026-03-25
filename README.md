@@ -24,3 +24,35 @@ A helper script for tearing down the dev environment without destroying protecte
 - Script is scoped to `infra/environments/dev` — not intended as a generic tool
 - The `-target` list is dynamically built from state, so new modules are automatically included without any script changes needed
 - The only hardcoded exclusion is `module.vpc`, which is stable by design
+
+## Database Seeding
+
+Seed scripts bootstrap the database with reference data required before the ingestion pipeline can run. Scripts live in `ingestion/seeds/`.
+
+### Prerequisites
+
+- Docker running with the local PostgreSQL container active
+- `DATABASE_URL` set in `ingestion/.env`
+- All Alembic migrations applied (`poetry run alembic upgrade head` from `backend/`)
+
+### Usage
+
+Run all seed scripts in the correct dependency order from the `ingestion/` directory:
+
+```bash
+poetry run python seeds/run_seeds.py
+```
+
+Individual scripts can also be run independently if needed:
+
+```bash
+poetry run python seeds/seed_seasons.py  # Seeds all NBA seasons from 1946 to present
+poetry run python seeds/seed_teams.py    # Seeds all 30 NBA teams with conference data
+poetry run python seeds/seed_players.py  # Seeds all active NBA players for the current season
+```
+
+### Notes
+
+- All seed scripts are idempotent — safe to run multiple times without creating duplicates
+- `seed_players.py` skips free agents (players with no current team)
+- Player `birth_date` and Team `logo` are not seeded and will be populated in a future enrichment step
