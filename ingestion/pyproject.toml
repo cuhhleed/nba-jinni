@@ -14,6 +14,7 @@ pydantic-settings = "^2.3.0"
 boto3 = "^1.34.0"
 python-dotenv = "^1.0.0"
 nbajinni-shared = { path = "../shared", develop = true }
+nba-api = "^1.11.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"

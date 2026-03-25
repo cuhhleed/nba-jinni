@@ -207,9 +207,9 @@ _As a developer, I want static reference data (teams, current season) pre-loaded
 
 Tasks:
 
-- [ ] Write a one-time seed script for all 30 NBA teams
-- [ ] Write a one-time seed script for the current season record
-- [ ] Document how to run seed scripts in the README
+- [x] Write a one-time seed script for all 30 NBA teams
+- [x] Write a one-time seed script for the current season record
+- [x] Document how to run seed scripts in the README
 
 ---
 
