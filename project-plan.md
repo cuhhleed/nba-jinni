@@ -236,9 +236,9 @@ Tasks:
 - ~~[ ] Read and document the api-sports.io NBA endpoint reference — identify the minimum set of endpoints needed for all stat views~~
 - ~~[ ] Implement a Python API client class wrapping `httpx` with: API key injection from Secrets Manager, response logging, error handling, and retry logic~~
 - ~~[ ] Implement a call counter utility that logs each API call to a DynamoDB table (or CloudWatch metric) so daily usage is trackable~~
-- [ ] Identify and document the `nba_api` endpoints needed for all stat views (game logs, player stats, rosters, injuries) [ADR-002]
-- [ ] Implement a lightweight `nba_api` wrapper with: request throttling (polite delays between calls), structured logging, error handling, and retry logic [ADR-002]
-- [ ] Write unit tests for the API client (mocked responses)
+- [x] Identify and document the `nba_api` endpoints needed for all stat views (game logs, player stats, rosters, injuries) [ADR-002]
+- [x] Implement a lightweight `nba_api` wrapper with: request throttling (polite delays between calls), structured logging, error handling, and retry logic [ADR-002]
+- [x] Write unit tests for the API client (mocked responses)
 
 ---
 
