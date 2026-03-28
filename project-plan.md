@@ -248,7 +248,7 @@ _As a developer, I want team rosters kept up to date so the database always refl
 Tasks:
 
 - [ ] Implement ingestion function: fetch all players for each team and upsert into `players` table
-- [ ] Schedule this function to run **weekly** (not nightly) ~~to conserve API calls~~ [ADR-002] to avoid unnecessary load on NBA.com
+- [ ] Schedule this function to run **bi-weekly** (not nightly) ~~to conserve API calls~~ [ADR-002] to avoid unnecessary load on NBA.com
 - [ ] Implement idempotent upsert logic (insert if not exists, update if changed)
 
 ---
