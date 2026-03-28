@@ -8,8 +8,8 @@ class Game(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
-    home_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
-    away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
+    home_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"),index=True)
+    away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
     season_year: Mapped[int] = mapped_column(ForeignKey("seasons.year"))
-    game_date: Mapped[date] = mapped_column()
+    game_date: Mapped[date] = mapped_column(index=True)
     status: Mapped[int] = mapped_column()

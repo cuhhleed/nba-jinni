@@ -8,7 +8,7 @@ class PlayerSeasonAverage(Base):
     __tablename__ = "player_season_averages"
 
     season: Mapped[int] = mapped_column(ForeignKey("seasons.year"), primary_key=True)
-    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True, index=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     games_played: Mapped[int] = mapped_column()
     min_pg: Mapped[float] = mapped_column(Numeric(5, 2))

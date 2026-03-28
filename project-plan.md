@@ -31,6 +31,7 @@ A full-stack web application for viewing NBA player and team statistics, designe
 ├── frontend/          # React + TypeScript app
 ├── backend/           # FastAPI application
 ├── ingestion/         # Nightly Lambda data pipeline
+├── shared/            # [ADR-001] Shared database models, utilities, and session initializer
 ├── infra/             # Terraform configurations
 │   ├── modules/
 │   └── environments/
@@ -45,14 +46,18 @@ A full-stack web application for viewing NBA player and team statistics, designe
 
 ## Data Architecture Notes
 
-### API Constraint Strategy
+### ~~API Constraint Strategy~~
 
-The free tier of api-sports.io allows **100 calls per 24 hours**. The ingestion pipeline must be designed to maximize data extracted per call:
+> ~~The free tier of api-sports.io allows **100 calls per 24 hours**. The ingestion pipeline must be designed to maximize data extracted per call:~~
+>
+> - ~~Fetch game logs by date range rather than game-by-game~~
+> - ~~Prioritize endpoints that return bulk player stats in a single response~~
+> - ~~Cache reference data (teams, rosters) and only re-fetch on a weekly basis, not nightly~~
+> - ~~Nightly job should focus only on games played in the last 24 hours~~
 
-- Fetch game logs by date range rather than game-by-game
-- Prioritize endpoints that return bulk player stats in a single response
-- Cache reference data (teams, rosters) and only re-fetch on a weekly basis, not nightly
-- Nightly job should focus only on games played in the last 24 hours
+### [ADR-002] Data Source Strategy
+
+The `nba_api` Python package is used for all data ingestion. It interfaces directly with NBA.com APIs, is completely free, and provides current season data. There is no hard API call budget, but NBA.com may throttle aggressive requests — the ingestion layer must include polite delays between calls. Roster and reference data should still be fetched weekly rather than nightly to reduce unnecessary load.
 
 ### Schema Design (Core Entities)
 
@@ -137,7 +142,7 @@ Tasks:
 - [x] Place RDS in a private subnet (no public access)
 - [x] Create a VPC, public/private subnets, and security groups to allow Lambda → RDS access
 - [x] Store DB credentials in AWS Secrets Manager via Terraform
-- [x ] Output RDS endpoint for use in other modules
+- [x] Output RDS endpoint for use in other modules
 
 ---
 
@@ -152,6 +157,7 @@ Tasks:
 - [x] Write Terraform for EventBridge rule (nightly cron) triggering the ingestion Lambda
 - [x] Configure IAM roles: Lambda execution role with RDS access and Secrets Manager read
 - [x] Configure Lambda VPC settings so it can reach RDS in the private subnet
+- ~~[ ] Provision a Secrets Manager entry for the api-sports.io API key~~ _(superseded by [ADR-002] — no third-party API key required)_
 
 ---
 
@@ -215,18 +221,23 @@ Tasks:
 
 ### EPIC 4 — Data Ingestion Pipeline
 
-**Goal:** Build a nightly Lambda function that pulls data from api-sports.io and populates the database efficiently within the 100 calls/day limit.
+**Goal:** ~~Build a nightly Lambda function that pulls data from api-sports.io and populates the database efficiently within the 100 calls/day limit.~~ [ADR-002] Build a nightly Lambda function that pulls current season data from NBA.com via the `nba_api` package and populates the database.
 
 ---
 
-**Story 4.1 — API client and rate limit management**
-_As a developer, I want a well-designed API client so that all calls to api-sports.io are tracked, logged, and never wasted._
+**Story 4.1 — ~~API client and rate limit management~~ [ADR-002] `nba_api` client and request throttling**
+
+~~_As a developer, I want a well-designed API client so that all calls to api-sports.io are tracked, logged, and never wasted._~~
+
+[ADR-002] _As a developer, I want a well-designed `nba_api` wrapper so that all requests are throttled, logged, and resilient to transient failures._
 
 Tasks:
 
-- [ ] Read and document the api-sports.io NBA endpoint reference — identify the minimum set of endpoints needed for all stat views
-- [ ] Implement a Python API client class wrapping `httpx` with: API key injection from Secrets Manager, response logging, error handling, and retry logic
-- [ ] Implement a call counter utility that logs each API call to a DynamoDB table (or CloudWatch metric) so daily usage is trackable
+- ~~[ ] Read and document the api-sports.io NBA endpoint reference — identify the minimum set of endpoints needed for all stat views~~
+- ~~[ ] Implement a Python API client class wrapping `httpx` with: API key injection from Secrets Manager, response logging, error handling, and retry logic~~
+- ~~[ ] Implement a call counter utility that logs each API call to a DynamoDB table (or CloudWatch metric) so daily usage is trackable~~
+- [ ] Identify and document the `nba_api` endpoints needed for all stat views (game logs, player stats, rosters, injuries) [ADR-002]
+- [ ] Implement a lightweight `nba_api` wrapper with: request throttling (polite delays between calls), structured logging, error handling, and retry logic [ADR-002]
 - [ ] Write unit tests for the API client (mocked responses)
 
 ---
@@ -237,7 +248,7 @@ _As a developer, I want team rosters kept up to date so the database always refl
 Tasks:
 
 - [ ] Implement ingestion function: fetch all players for each team and upsert into `players` table
-- [ ] Schedule this function to run **weekly** (not nightly) to conserve API calls
+- [ ] Schedule this function to run **weekly** (not nightly) ~~to conserve API calls~~ [ADR-002] to avoid unnecessary load on NBA.com
 - [ ] Implement idempotent upsert logic (insert if not exists, update if changed)
 
 ---
@@ -249,8 +260,8 @@ Tasks:
 
 - [ ] Implement nightly ingestion function: fetch all games played in the last 24 hours
 - [ ] For each completed game, fetch player stats and upsert into `player_game_stats`
-- [ ] Derive and upsert updated `player_season_averages` from the raw game stats (compute locally — do not use an extra API call)
-- [ ] Implement injury report ingestion (daily, low call cost)
+- [ ] Derive and upsert updated `player_season_averages` from the raw game stats (compute locally)
+- [ ] Implement injury report ingestion (daily)
 - [ ] Write integration tests against a local Postgres instance using Docker
 
 ---
@@ -262,6 +273,7 @@ Tasks:
 
 - [ ] Configure Lambda handler entry point
 - [ ] Set up dependency packaging (Lambda layer or bundled zip)
+- [ ] Ensure `/shared` is bundled as part of the ingestion Lambda deployment zip [ADR-001]
 - [ ] Verify Lambda can connect to RDS inside the VPC
 - [ ] Add CloudWatch log group and structured logging
 - [ ] Manually trigger and verify a successful run end-to-end before automating
@@ -280,6 +292,7 @@ _As a developer, I want a clean FastAPI project wired up to PostgreSQL so I have
 Tasks:
 
 - [ ] Initialize FastAPI project under `/backend`
+- [ ] Install `/shared` as a local dependency in the `/backend` package and import models and session initializer from it [ADR-001]
 - [ ] Configure SQLAlchemy async engine with connection pooling
 - [ ] Set up dependency injection pattern for DB sessions
 - [ ] Configure Mangum handler to run FastAPI inside AWS Lambda
@@ -288,17 +301,17 @@ Tasks:
 
 ---
 
-**Story 5.2 — Authentication**
-_As a user, I want to register and log in with email and password so my session is secure._
+~~**Story 5.2 — Authentication**~~
+~~_As a user, I want to register and log in with email and password so my session is secure._~~
 
 Tasks:
 
-- [ ] Implement `POST /auth/register` — hash password with bcrypt, insert user, return JWT
-- [ ] Implement `POST /auth/login` — verify password, return JWT
-- [ ] Implement JWT middleware for protected routes
-- [ ] Write unit tests for auth endpoints
+- [ ] ~~Implement `POST /auth/register` — hash password with bcrypt, insert user, return JWT~~
+- [ ] ~~Implement `POST /auth/login` — verify password, return JWT~~
+- [ ] ~~Implement JWT middleware for protected routes~~
+- [ ] ~~Write unit tests for auth endpoints~~
 
----
+**\*_user authentication shelved in ADR-003, will be considered as an added feature later on_**
 
 **Story 5.3 — Player and team endpoints**
 _As a user, I want to search for players and browse teams so I can navigate to the stats I need._
@@ -347,18 +360,18 @@ Tasks:
 
 ---
 
-**Story 6.2 — Authentication views**
-_As a user, I want to register and log in so I can access the app._
+~~**Story 6.2 — Authentication views**~~
+~~_As a user, I want to register and log in so I can access the app._~~
 
 Tasks:
 
-- [ ] Build `/login` page — form, API call, store JWT, redirect on success
-- [ ] Build `/register` page — form, API call, redirect to login on success
-- [ ] Implement auth context (global user/token state)
-- [ ] Implement protected route wrapper — redirect to login if unauthenticated
-- [ ] Implement logout
+- [ ] ~~Build `/login` page — form, API call, store JWT, redirect on success~~
+- [ ] ~~Build `/register` page — form, API call, redirect to login on success~~
+- [ ] ~~Implement auth context (global user/token state)~~
+- [ ] ~~Implement protected route wrapper — redirect to login if unauthenticated~~
+- [ ] ~~Implement logout~~
 
----
+**\*_user authentication shelved in ADR-003, will be considered as an added feature later on_**
 
 **Story 6.3 — Team browser and player navigation**
 _As a user, I want to browse teams and drill into their rosters so I can find the player I'm looking for._
@@ -447,6 +460,7 @@ Tasks:
 - [ ] Create `.github/workflows/backend.yml`
 - [ ] On PR: run `flake8`, `black --check`, and `pytest`
 - [ ] On merge to `main`: package Lambda zip, run `alembic upgrade head` against RDS, deploy zip to Lambda via AWS CLI
+- [ ] Ensure the backend Lambda zip includes `/shared` as a bundled dependency [ADR-001]
 - [ ] Store DB connection string and Lambda function name as GitHub Actions secrets
 
 ---
@@ -521,16 +535,18 @@ Tasks:
 
 ## Key Technical Decisions Log
 
-| Decision           | Choice                       | Rationale                                                               |
-| ------------------ | ---------------------------- | ----------------------------------------------------------------------- |
-| Frontend framework | React + TypeScript           | Most employer-recognizable; TypeScript signals maturity                 |
-| Backend language   | Python + FastAPI             | Shared with ingestion; modern, fast, auto-docs                          |
-| Database           | PostgreSQL (RDS)             | Relational model fits domain; industry standard                         |
-| ORM                | SQLAlchemy + Alembic         | Python standard; migration workflow is a portfolio skill                |
-| Auth               | JWT (custom)                 | No external dependency; demonstrates understanding of auth fundamentals |
-| API compute        | Lambda + API Gateway         | Free tier; serverless pattern worth knowing                             |
-| Frontend hosting   | S3 + CloudFront              | Effectively free; standard static hosting pattern                       |
-| IaC                | Terraform                    | Cloud-agnostic; widely recognized across employers                      |
-| CI/CD              | GitHub Actions               | Lives in repo; OIDC AWS auth; highly visible to employers               |
-| Repo structure     | Monorepo                     | Solo project; reduces friction; unified CI/CD                           |
-| Data freshness     | Nightly Lambda (EventBridge) | Fits API call budget; serverless; clean pattern                         |
+| Decision              | Choice                       | Rationale                                                                                                                        |
+| --------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend framework    | React + TypeScript           | Most employer-recognizable; TypeScript signals maturity                                                                          |
+| Backend language      | Python + FastAPI             | Shared with ingestion; modern, fast, auto-docs                                                                                   |
+| Database              | PostgreSQL (RDS)             | Relational model fits domain; industry standard                                                                                  |
+| ORM                   | SQLAlchemy + Alembic         | Python standard; migration workflow is a portfolio skill                                                                         |
+| Auth                  | JWT (custom)                 | No external dependency; demonstrates understanding of auth fundamentals                                                          |
+| API compute           | Lambda + API Gateway         | Free tier; serverless pattern worth knowing                                                                                      |
+| Frontend hosting      | S3 + CloudFront              | Effectively free; standard static hosting pattern                                                                                |
+| IaC                   | Terraform                    | Cloud-agnostic; widely recognized across employers                                                                               |
+| CI/CD                 | GitHub Actions               | Lives in repo; OIDC AWS auth; highly visible to employers                                                                        |
+| Repo structure        | Monorepo                     | Solo project; reduces friction; unified CI/CD                                                                                    |
+| Data freshness        | Nightly Lambda (EventBridge) | Fits API call budget; serverless; clean pattern                                                                                  |
+| Shared code (ADR-001) | `/shared` package            | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                              |
+| Data source (ADR-002) | `nba_api` Python package     | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost |

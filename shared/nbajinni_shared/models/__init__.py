@@ -6,3 +6,7 @@ from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.users import User
+from nbajinni_shared.models.team_game_stats import TeamGameStat
+from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
+
+

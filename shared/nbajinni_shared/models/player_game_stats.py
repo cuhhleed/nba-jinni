@@ -7,8 +7,8 @@ from nbajinni_shared.base import Base
 class PlayerGameStat(Base):
     __tablename__ = "player_game_stats"
 
-    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), primary_key=True)
-    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), primary_key=True, index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True,index=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     pos: Mapped[str] = mapped_column()
     min: Mapped[int] = mapped_column()

@@ -58,8 +58,6 @@ Identified during Story 2.3 when `terraform destroy` was taking 20+ minutes to c
 - `terraform destroy` errors on `prevent_destroy` resources — a targeted destroy is required for routine teardowns.
 - Manually maintaining a `-target` list is error-prone and becomes stale as new modules are added to the project.
 - The Secrets Manager 30-day recovery window causes redeployment failures if the secret is not force-deleted before recreating.
-  <<<<<<< Updated upstream
-  =======
 - Current workaround:
 
 ```
@@ -100,7 +98,7 @@ This is self-maintaining — new modules are automatically included without any 
 
 ---
 
-## FEATURE-003 — Shared Models Package
+## FEATURE-003 — Shared Models Package — **COMPLETE**
 
 ### Status
 
@@ -129,13 +127,75 @@ Create a dedicated `/shared` package containing the `DeclarativeBase` and all SQ
 
 ### Tasks
 
-- [ ] Create `/shared` package with `pyproject.toml` and `nbajinni_shared/` module structure
-- [ ] Move `DeclarativeBase` from `backend/app/db/base.py` to `shared/nbajinni_shared/base.py`
-- [ ] Move all models from `backend/app/models/` to `shared/nbajinni_shared/models/`
-- [ ] Add `nbajinni-shared` as a local path dependency in `backend/pyproject.toml` and `ingestion/pyproject.toml`
-- [ ] Update `backend/alembic/env.py` imports to reference shared package
-- [ ] Update all backend imports that reference `app.models` or `app.db.base` to reference `nbajinni_shared`
-- [ ] Verify migrations still run correctly after refactor
-- [ ] Verify ingestion seed scripts can import models from shared package
+- [x] Create `/shared` package with `pyproject.toml` and `nbajinni_shared/` module structure
+- [x] Move `DeclarativeBase` from `backend/app/db/base.py` to `shared/nbajinni_shared/base.py`
+- [x] Move all models from `backend/app/models/` to `shared/nbajinni_shared/models/`
+- [x] Add `nbajinni-shared` as a local path dependency in `backend/pyproject.toml` and `ingestion/pyproject.toml`
+- [x] Update `backend/alembic/env.py` imports to reference shared package
+- [x] Update all backend imports that reference `app.models` or `app.db.base` to reference `nbajinni_shared`
+- [x] Verify migrations still run correctly after refactor
+- [x] Verify ingestion seed scripts can import models from shared package
 
 ---
+
+## FEATURE-004 — Schema Amendments for Team Statistics and Standings — **COMPLETE**
+
+### Status
+
+Pending — implement at start of Epic 4 (Story 4.0)
+
+### Background
+
+Identified during Epic 4 feature planning when the full statistics dashboard was scoped out. The existing schema was designed before the frontend feature set was fully defined. Now that the data requirements of every dashboard view are understood, three schema changes are needed before ingestion work begins: two new tables for team-level statistics and targeted amendments to the existing `standings` table.
+
+### Problem
+
+- The schema has no team-level box score table — team statistics per game cannot be stored or queried without summing player rows, which is fragile and produces rounding drift on percentage fields
+- The schema has no team season averages table — serving comparison stats on the game detail page (e.g. average points allowed) would require expensive aggregate queries on every request
+- The existing `standings` model has a redundant `win_streak` boolean that duplicates information already encoded in the sign of the `streak` integer, creating a two-field synchronisation risk on every upsert
+- The `standings` model is missing `division_rank`, `points_pg`, and `opp_points_pg` — all of which are returned directly by `LeagueStandingsV3` at no extra cost and are needed for the standings widget and team comparison surface
+- The `standings` model has no `updated_at` column — since rows are upserted rather than appended, there is no way to determine when the data was last refreshed without it
+
+### Constraints
+
+- `team_game_stats` must be populated from the team result set returned by `BoxScoreTraditionalV2` — the same call already made for player stats — so no additional API calls are introduced
+- `team_season_averages` must be derived locally from `team_game_stats` after each nightly upsert, following the same pattern as `player_season_averages`, to avoid spending an API call on data that can be computed
+- The `standings` amendments require a new Alembic migration against an already-deployed table — the migration must use `ALTER TABLE` rather than recreating the table to preserve any existing rows
+
+### Proposed Changes
+
+**New table: `team_game_stats`**
+
+```
+game_id (PK, FK → games.id), team_id (PK, FK → teams.id),
+points, opponent_points, rebounds, assists, steals, blocks,
+turnovers, fg_pct, three_pct, ft_pct
+```
+
+**New table: `team_season_averages`**
+
+```
+team_id (PK, FK → teams.id), season_id (PK, FK → seasons.id),
+games_played, points, opponent_points, rebounds, assists, steals,
+blocks, turnovers, fg_pct, three_pct, ft_pct
+```
+
+**Amended model: `standings`**
+
+| Field           | Change     | Reason                                                                |
+| --------------- | ---------- | --------------------------------------------------------------------- |
+| `win_streak`    | **Remove** | Redundant — direction is encoded in the sign of `streak`              |
+| `division_rank` | **Add**    | Returned directly by `LeagueStandingsV3`; needed for standings widget |
+| `points_pg`     | **Add**    | Returned directly by `LeagueStandingsV3`; needed for team comparison  |
+| `opp_points_pg` | **Add**    | Returned directly by `LeagueStandingsV3`; needed for team comparison  |
+| `updated_at`    | **Add**    | Tracks data freshness on upserted rows                                |
+
+### Tasks
+
+- [x] Write Alembic migration: create `team_game_stats` table
+- [x] Write Alembic migration: create `team_season_averages` table
+- [x] Write Alembic migration: amend `standings` — drop `win_streak`, add ~~`division_rank`,~~ `points_pg`, `opp_points_pg`, `updated_at`
+- [x] Update `Standing` model in `/shared` to reflect amended schema
+- [x] Add `TeamGameStat` and `TeamSeasonAverage` models to `/shared`
+- [x] Verify all migrations apply cleanly with `alembic upgrade head`
+- [x] Marked indexes in model files otherwise alembic autogenerate reverses manual add_indexes migration.
