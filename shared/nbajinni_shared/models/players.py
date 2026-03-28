@@ -13,3 +13,4 @@ class Player(Base):
     last_name: Mapped[str] = mapped_column()
     birth_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
+    active: Mapped[bool] = mapped_column(default=True)
