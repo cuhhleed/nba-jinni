@@ -9,7 +9,7 @@ from sqlalchemy import func
 class Standing(Base):
     __tablename__ = "standings"
 
-    season: Mapped[int] = mapped_column(ForeignKey("seasons.year"), primary_key=True)
+    season: Mapped[int] = mapped_column(ForeignKey("seasons.season"), primary_key=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), primary_key=True,index=True)
     conference: Mapped[str] = mapped_column()
     conference_rank: Mapped[int] = mapped_column()
