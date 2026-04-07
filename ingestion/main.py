@@ -11,7 +11,7 @@ from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.nba_api_wrapper import NbaApiWrapper
 from nbajinni_shared.session import AsyncSessionLocal
-from nbajinni_shared.utils import get_all_players, get_all_games, get_current_season, get_game_stats, ingest_games, compute_player_averages, compute_team_averages
+from nbajinni_shared.utils import get_all_players, get_all_games, get_current_season, get_game_stats, ingest_games, compute_player_averages, compute_team_averages, ingest_standings
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
@@ -65,6 +65,12 @@ async def run_nightly():
             logger.info(
                 "team_averages_computation_complete",
                 message=f"Team Averages Calculated Successfully. {team_averages_processed} team averages updated.",
+            )
+
+            standings_processed = await ingest_standings(session, get_current_season())
+            logger.info(
+                "standings_refresh_complete",
+                message=f"Team Standings Updated Successfully. {standings_processed} standings updated.",
             )
 
 

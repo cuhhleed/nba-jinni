@@ -258,9 +258,9 @@ _As a developer, I want last night's game stats automatically ingested so the da
 
 Tasks:
 
-- [ ] Implement nightly ingestion function: fetch all games played in the last 24 hours
-- [ ] For each completed game, fetch player stats and upsert into `player_game_stats`
-- [ ] Derive and upsert updated `player_season_averages` from the raw game stats (compute locally)
+- [x] Implement nightly ingestion function: fetch all games played in the last 24 hours
+- [x] For each completed game, fetch player stats and upsert into `player_game_stats`
+- [x] Derive and upsert updated `player_season_averages` from the raw game stats (compute locally)
 - [ ] Implement injury report ingestion (daily)
 - [ ] Write integration tests against a local Postgres instance using Docker
 

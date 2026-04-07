@@ -9,18 +9,21 @@ from seed_teams import main as seed_teams
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 
-async def main():
+async def main(env="dev"):
     print("==> Seeding seasons...")
-    await seed_seasons()
+    await seed_seasons(env=env)
 
     print("==> Seeding teams...")
-    await seed_teams()
+    await seed_teams(env=env)
 
     print("==> Seeding players...")
-    await seed_players()
+    await seed_players(env=env)
 
     print("==> All seeds completed.")
 
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--env")
+    args = parser.parse_args()
+    asyncio.run(main(env=args.env))
