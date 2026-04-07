@@ -4,11 +4,13 @@ from datetime import datetime
 from nba_api.stats.endpoints import CommonAllPlayers
 from nba_api.stats.endpoints import ScheduleLeagueV2
 from nba_api.stats.endpoints import BoxScoreTraditionalV3
+from nba_api.stats.endpoints import LeagueStandingsV3
 from nbajinni_shared.nba_api_wrapper import NbaApiWrapper
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
+from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.players import Player
 from sqlalchemy.dialects.postgresql import insert
@@ -26,10 +28,10 @@ def get_current_season() -> str:
 current_season = get_current_season()
 
 async def get_all_players(season=current_season):
-    return await asyncio.to_thread(wrapper.call, CommonAllPlayers, is_only_current_season=1, league_id="00", season=season)[0]
+    return (await asyncio.to_thread(wrapper.call, CommonAllPlayers, is_only_current_season=1, league_id="00", season=season))[0]
 
 async def get_all_games(season=current_season):
-    return await asyncio.to_thread(wrapper.call, ScheduleLeagueV2, league_id="00", season=season)[0]
+    return (await asyncio.to_thread(wrapper.call, ScheduleLeagueV2, league_id="00", season=season))[0]
 
 async def get_game_stats(game_id):
     box_score = await asyncio.to_thread(
@@ -131,6 +133,65 @@ async def ingest_games(games, session):
         game.status = 3
     
     return (processed_games, processed_player_stats, processed_team_stats)
+
+async def ingest_standings(session, season):
+    processed = 0
+
+    standings = (await asyncio.to_thread(wrapper.call, LeagueStandingsV3, league_id="00", season=season, season_type="Regular Season"))[0]
+
+    for _, standing in standings.iterrows():
+        home_record = standing["HOME"].split('-')
+        away_record = standing["ROAD"].split('-')
+        last_ten_record= standing["L10"].split('-')
+        stmt = (
+            insert(Standing).values(
+                season=season,
+                team_id=standing["TeamID"],
+                conference=standing["Conference"],
+                conference_rank=standing["PlayoffRank"],
+                wins=standing["WINS"],
+                wins_home=int(home_record[0]),
+                wins_away=int(away_record[0]),
+                losses=standing["LOSSES"],
+                losses_home=int(home_record[1]),
+                losses_away=int(away_record[1]),
+                win_pct=standing["WinPCT"],
+                games_behind=standing["ConferenceGamesBack"],
+                win_L10=int(last_ten_record[0]),
+                loss_L10=int(last_ten_record[1]),
+                streak=standing["CurrentStreak"],
+                points_pg=standing["PointsPG"],
+                opp_points_pg=standing["OppPointsPG"],
+                updated_at=datetime.now()
+            )
+            .on_conflict_do_update(
+                index_elements=["team_id", "season"],
+                set_={
+                    "conference": standing["Conference"],
+                    "conference_rank": standing["PlayoffRank"],
+                    "wins": standing["WINS"],
+                    "wins_home": int(home_record[0]),
+                    "wins_away": int(away_record[0]),
+                    "losses": standing["LOSSES"],
+                    "losses_home": int(home_record[1]),
+                    "losses_away": int(away_record[1]),
+                    "win_pct": standing["WinPCT"],
+                    "games_behind": standing["ConferenceGamesBack"],
+                    "win_L10": int(last_ten_record[0]),
+                    "loss_L10": int(last_ten_record[1]),
+                    "streak": standing["CurrentStreak"],
+                    "points_pg": standing["PointsPG"],
+                    "opp_points_pg": standing["OppPointsPG"],
+                    "updated_at": datetime.now()
+                }
+            )
+        )
+
+        result = await session.execute(stmt)
+        if result.rowcount == 1:
+            processed += 1
+    
+    return processed
 
 async def compute_player_averages(season, session):
     processed = 0

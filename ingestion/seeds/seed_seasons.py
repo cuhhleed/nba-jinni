@@ -1,18 +1,14 @@
 import asyncio
 from datetime import datetime
-from pathlib import Path
-
-from dotenv import load_dotenv
 from nbajinni_shared.models.seasons import Season
-from nbajinni_shared.session import AsyncSessionLocal
+from nbajinni_shared.session import get_session_factory
 from sqlalchemy.dialects.postgresql import insert
 
-load_dotenv(Path(__file__).parent.parent / ".env")
 
-
-async def main():
+async def main(env="dev"):
     inserted = 0
     skipped = 0
+    AsyncSessionLocal = get_session_factory(env)
     async with AsyncSessionLocal() as session:
         async with session.begin():
             for year_i in range(1946, datetime.now().year + 1):
@@ -31,4 +27,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--env")
+    args = parser.parse_args()
+    asyncio.run(main(env=args.env))

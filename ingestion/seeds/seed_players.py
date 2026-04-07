@@ -1,25 +1,22 @@
 import asyncio
-from pathlib import Path
 
-from dotenv import load_dotenv
 from nbajinni_shared.models.players import Player
-from nbajinni_shared.session import AsyncSessionLocal
+from nbajinni_shared.session import get_session_factory
 from nbajinni_shared.utils import get_all_players, get_current_season
 from sqlalchemy.dialects.postgresql import insert
 
-load_dotenv(Path(__file__).parent.parent / ".env")
 
-
-async def main():
+async def main(env="dev"):
     current_season = get_current_season()
     players = await get_all_players(current_season)
-    await upsert_players(players)
+    await upsert_players(players, env)
 
 
-async def upsert_players(players):
+async def upsert_players(players, env):
     inserted = 0
     skipped = 0
 
+    AsyncSessionLocal = get_session_factory(env)
     async with AsyncSessionLocal() as session:
         async with session.begin():
             for _, player in players.iterrows():
@@ -63,4 +60,8 @@ async def upsert_players(players):
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--env")
+    args = parser.parse_args()
+    asyncio.run(main(env=args.env))

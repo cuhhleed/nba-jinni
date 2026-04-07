@@ -199,3 +199,46 @@ blocks, turnovers, fg_pct, three_pct, ft_pct
 - [x] Add `TeamGameStat` and `TeamSeasonAverage` models to `/shared`
 - [x] Verify all migrations apply cleanly with `alembic upgrade head`
 - [x] Marked indexes in model files otherwise alembic autogenerate reverses manual add_indexes migration.
+
+---
+
+## FEATURE-005 — Historical Season Backfill Lambda
+
+### Status
+
+Pending
+
+### Background
+
+Identified during Story 4.3 development when scoping the nightly ingestion job. Historical season data is on the roadmap (e.g. multi-season vs-opponent and vs-matchup stat views) but is not required for any features currently being implemented. Backfill was originally stubbed as `run_backfill()` inside the main ingestion Lambda handler.
+
+### Problem
+
+- A backfill run for a full historical season can involve hundreds of game stat fetches with throttle delays between each — execution time is unbounded relative to a nightly job and incompatible with sharing a Lambda timeout configuration
+- Keeping backfill inside the nightly Lambda forces the timeout to be provisioned for the worst-case backfill scenario, over-provisioning for every other job
+- The stub in the current handler should be removed once this feature is promoted to its own function
+
+### Constraints
+
+- Each invocation should process exactly one season, passed as input — this keeps execution time bounded and makes partial backfills resumable by re-invoking with the same season
+- The function must use the same `nba_api` wrapper, throttling, and upsert patterns as the nightly job — backfill inserts into the same `player_game_stats`, `team_game_stats`, `player_season_averages`, and `team_season_averages` tables
+- Already-ingested games must be skipped idempotently — backfill should be safe to re-run against a season without producing duplicates or overwriting valid data
+- The function must respect NBA.com throttling — a full season backfill should not attempt to fetch all games in rapid succession
+
+### Proposed Solution
+
+A dedicated Lambda function that accepts `{ "season": "2023-24" }` as its event payload. The bulk of the implementation already exists — `ingest_games`, `compute_player_averages`, and `compute_team_averages` in `utils.py` are reusable as-is. The remaining work is refactoring `run_schedule_biweekly` and `run_roster_biweekly` in `main.py` so their core logic is extracted into standalone utility functions in `utils.py`, allowing the backfill handler to call schedule and roster fetching for an arbitrary season rather than always defaulting to the current one. The backfill handler then orchestrates these utilities in sequence: fetch roster → fetch schedule → ingest completed games → compute averages.
+
+### Tasks
+
+- [ ] Remove `run_backfill()` stub and `backfill` job routing from the nightly Lambda handler
+- [ ] Extract schedule ingestion logic from `run_schedule_biweekly` into a reusable `ingest_schedule(season, session)` utility function in `utils.py`
+- [ ] Extract roster ingestion logic from `run_roster_biweekly` into a reusable `ingest_roster(season, session)` utility function in `utils.py`
+- [ ] Refactor `run_schedule_biweekly` and `run_roster_biweekly` in `main.py` to call the new utility functions rather than containing the logic directly
+- [ ] Create a new Lambda function under `/ingestion` with its own handler entry point
+- [ ] Accept `season` as a required event input — error clearly if missing or malformed
+- [ ] Orchestrate `ingest_roster`, `ingest_schedule`, `ingest_games`, `compute_player_averages`, and `compute_team_averages` in the backfill handler
+- [ ] Add Terraform `lambda` module for the backfill function with independently configurable timeout and memory
+- [ ] Document invocation instructions in the README
+
+---
