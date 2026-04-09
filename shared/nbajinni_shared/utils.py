@@ -14,7 +14,7 @@ from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.players import Player
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy import select, func, exists
+from sqlalchemy import select, func, exists, update
 
 wrapper = NbaApiWrapper()
 
@@ -188,9 +188,82 @@ async def ingest_standings(session, season):
         )
 
         result = await session.execute(stmt)
-        if result.rowcount == 1:
+        if result.rowcount in (1, 2):
             processed += 1
-    
+
+    return processed
+
+async def ingest_roster(session, season):
+    players = await get_all_players(season)
+    processed = 0
+
+    await session.execute(update(Player).values(active=False))
+
+    for _, player in players.iterrows():
+        if player["TEAM_ID"] == 0:
+            continue
+
+        full_name_split = player["DISPLAY_FIRST_LAST"].split(" ")
+        first_name = full_name_split[0]
+        last_name = " ".join(full_name_split[1:])
+        stmt = (
+            insert(Player)
+            .values(
+                id=player["PERSON_ID"],
+                first_name=first_name,
+                last_name=last_name,
+                team_id=player["TEAM_ID"],
+                birth_date=None,
+            )
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "team_id": player["TEAM_ID"],
+                    "birth_date": None,
+                    "active": True,
+                },
+            )
+        )
+        result = await session.execute(stmt)
+        if result.rowcount in (1, 2):
+            processed += 1
+
+    return processed
+
+async def ingest_schedule(session, season):
+    games = await get_all_games(season)
+    processed = 0
+
+    for _, game in games.iterrows():
+        if game["gameLabel"]:
+            continue
+
+        game_date = datetime.strptime(game["gameDate"], "%m/%d/%Y %H:%M:%S").date()
+        stmt = (
+            insert(Game)
+            .values(
+                id=game["gameId"],
+                home_team_id=game["homeTeam_teamId"],
+                away_team_id=game["awayTeam_teamId"],
+                game_date=game_date,
+                season=season,
+                status=game["gameStatus"]
+            )
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "home_team_id": game["homeTeam_teamId"],
+                    "away_team_id": game["awayTeam_teamId"],
+                    "game_date": game_date
+                },
+            )
+        )
+        result = await session.execute(stmt)
+        if result.rowcount in (1, 2):
+            processed += 1
+
     return processed
 
 async def compute_player_averages(season, session):
@@ -199,7 +272,6 @@ async def compute_player_averages(season, session):
     player_avg_query = (
         select(
             PlayerGameStat.player_id,
-            func.max(PlayerGameStat.team_id).label("team_id"),
             func.count(PlayerGameStat.game_id).label("games_played"),
             func.avg(PlayerGameStat.min).label("min_pg"),
             func.avg(PlayerGameStat.points).label("points_pg"),
@@ -234,7 +306,6 @@ async def compute_player_averages(season, session):
             .values(
                 player_id=row.player_id,
                 season=season,
-                team_id=row.team_id,
                 games_played=row.games_played,
                 min_pg=row.min_pg,
                 points_pg=row.points_pg,
@@ -260,7 +331,6 @@ async def compute_player_averages(season, session):
             .on_conflict_do_update(
                 index_elements=["player_id", "season"],
                 set_={
-                    "team_id": row.team_id,
                     "games_played": row.games_played,
                     "min_pg": row.min_pg,
                     "points_pg": row.points_pg,
@@ -287,9 +357,9 @@ async def compute_player_averages(season, session):
         )
 
         result = await session.execute(stmt)
-        if result.rowcount == 1:
+        if result.rowcount in (1, 2):
             processed += 1
-    
+
     return processed
 
 async def compute_team_averages(season, session):
@@ -353,7 +423,7 @@ async def compute_team_averages(season, session):
         )
 
         result = await session.execute(stmt)
-        if result.rowcount == 1:
+        if result.rowcount in (1, 2):
             processed += 1
-    
+
     return processed

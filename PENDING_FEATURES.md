@@ -4,11 +4,11 @@ This document tracks features, refactors, and architectural improvements that ha
 
 ---
 
-## FEATURE-001 — Security Group Module Extraction — **COMPLETE**
+## FEATURE-001 — Security Group Module Extraction
 
 ### Status
 
-Pending
+**COMPLETE**
 
 ### Background
 
@@ -42,11 +42,11 @@ Create a dedicated `modules/security_groups/` module that is entirely generic �
 
 ---
 
-## FEATURE-002 — Dynamic Teardown Script — **COMPLETE**
+## FEATURE-002 — Dynamic Teardown Script
 
 ### Status
 
-Pending — implement after FEATURE-001
+**COMPLETE**
 
 ### Background
 
@@ -98,11 +98,11 @@ This is self-maintaining — new modules are automatically included without any 
 
 ---
 
-## FEATURE-003 — Shared Models Package — **COMPLETE**
+## FEATURE-003 — Shared Models Package
 
 ### Status
 
-Pending
+**COMPLETE**
 
 ### Background
 
@@ -138,11 +138,11 @@ Create a dedicated `/shared` package containing the `DeclarativeBase` and all SQ
 
 ---
 
-## FEATURE-004 — Schema Amendments for Team Statistics and Standings — **COMPLETE**
+## FEATURE-004 — Schema Amendments for Team Statistics and Standings
 
 ### Status
 
-Pending — implement at start of Epic 4 (Story 4.0)
+**COMPLETE**
 
 ### Background
 
@@ -206,7 +206,7 @@ blocks, turnovers, fg_pct, three_pct, ft_pct
 
 ### Status
 
-Pending
+FURTHER PLANNING NEEDED
 
 ### Background
 

@@ -1,11 +1,9 @@
 import time
-
-import requests
 from nbajinni_shared.logging import get_logger
 
 
 class NbaApiWrapper:
-    def __init__(self, back_off_throttle=10.0, call_count_throttle=2.0):
+    def __init__(self, back_off_throttle=1.0, call_count_throttle=1.0):
         self.back_off_throttle = back_off_throttle
         self.call_count_throttle = call_count_throttle
         self.logger = get_logger("nba_api_wrapper")
