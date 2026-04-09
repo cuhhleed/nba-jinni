@@ -11,7 +11,6 @@ class PlayerSeasonAverage(Base):
 
     season: Mapped[str] = mapped_column(ForeignKey("seasons.season"), primary_key=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     games_played: Mapped[int] = mapped_column()
     min_pg: Mapped[float] = mapped_column(Numeric(5, 2))
     points_pg: Mapped[float] = mapped_column(Numeric(5, 2))

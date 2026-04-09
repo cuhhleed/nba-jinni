@@ -68,3 +68,5 @@ secrets/
 # ── Lambda packaging artifacts ───────────────────────────
 *.zip
 layer/
+
+.claude/
