@@ -13,10 +13,15 @@ from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.players import Player
+from nbajinni_shared.logging import get_logger
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select, func, exists, update
 
+logger = get_logger("ingestion")
 wrapper = NbaApiWrapper()
+
+class InvalidGameData(ValueError):
+    pass
 
 def get_current_season() -> str:
     now = datetime.now()
@@ -55,83 +60,111 @@ async def get_game_stats(game_id):
 
 async def ingest_games(games, session):
     processed_games, processed_player_stats, processed_team_stats = 0, 0, 0
+    game_ids = [(game.id, game.season) for game in games]
 
-    for game in games:
-        game_id = game.id
-        player_stats, team_stats = await get_game_stats(game_id)
-        
-        if player_stats is None:
-            continue
+    for game_id, game_season in game_ids:
+        try:
+            processed_player_stats_pg, processed_team_stats_pg = 0, 0
+            player_stats, team_stats = await get_game_stats(game_id)
 
-        for _, player_stat_row in player_stats.iterrows():
-            player_exists = await session.scalar(
-                select(exists().where(Player.id == player_stat_row["personId"]))
-            )
-
-            if not player_exists:
+            if player_stats is None or team_stats is None:
                 continue
 
-            min_floor = int(player_stat_row["minutes"].split(":")[0]) if player_stat_row["minutes"] else 0
-            stmt = (
-                insert(PlayerGameStat).values(
-                    game_id=game_id,
-                    player_id=player_stat_row["personId"],
-                    season=game.season,
-                    team_id=player_stat_row["teamId"],
-                    pos=player_stat_row["position"],
-                    min=min_floor,
-                    points=player_stat_row["points"],
-                    fgm=player_stat_row["fieldGoalsMade"],
-                    fga=player_stat_row["fieldGoalsAttempted"],
-                    fgp=player_stat_row["fieldGoalsPercentage"],
-                    ftm=player_stat_row["freeThrowsMade"],
-                    fta=player_stat_row["freeThrowsAttempted"],
-                    ftp=player_stat_row["freeThrowsPercentage"],
-                    tpm=player_stat_row["threePointersMade"],
-                    tpa=player_stat_row["threePointersAttempted"],
-                    tpp=player_stat_row["threePointersPercentage"],
-                    off_reb=player_stat_row["reboundsOffensive"],
-                    def_reb=player_stat_row["reboundsDefensive"],
-                    tot_reb=player_stat_row["reboundsTotal"],
-                    asts=player_stat_row["assists"],
-                    stls=player_stat_row["steals"],
-                    blks=player_stat_row["blocks"],
-                    tos=player_stat_row["turnovers"],
-                    pfs=player_stat_row["foulsPersonal"],
-                    plus_minus=player_stat_row["plusMinusPoints"]
-                ).on_conflict_do_nothing()
-            )
+            player_ids = set(player_stats["personId"].tolist())
 
-            result = await session.execute(stmt)
-            if result.rowcount == 1:
-                processed_player_stats += 1
-        
-        for _, team_stat_row in team_stats.iterrows():
-            stmt = (
-                insert(TeamGameStat).values(
-                    game_id=team_stat_row["gameId"],
-                    team_id=team_stat_row["teamId"],
-                    season=game.season,
-                    points=team_stat_row["points"],
-                    opponent_points = team_stats[team_stats["teamId"] != team_stat_row["teamId"]]["points"].values[0],
-                    rebounds=team_stat_row["reboundsTotal"],
-                    assists=team_stat_row["assists"],
-                    steals=team_stat_row["steals"],
-                    blocks=team_stat_row["blocks"],
-                    turnovers=team_stat_row["turnovers"],
-                    fg_pct=team_stat_row["fieldGoalsPercentage"],
-                    three_pct=team_stat_row["threePointersPercentage"],
-                    ft_pct=team_stat_row["freeThrowsPercentage"],
-                ).on_conflict_do_nothing()
-            )
+            if player_ids:
+                existing_players = set(
+                    (await session.execute(
+                        select(Player.id).where(Player.id.in_(player_ids))
+                    )).scalars().all()
+                )
+            else:
+                existing_players = set()
 
-            result = await session.execute(stmt)
-            if result.rowcount == 1:
-                processed_team_stats += 1
-        
-        processed_games += 1
-        game.status = 3
-    
+            for _, player_stat_row in player_stats.iterrows():
+                if player_stat_row["personId"] not in existing_players:
+                    continue
+                
+                try:
+                    min_floor = int(player_stat_row["minutes"].split(":")[0]) if player_stat_row["minutes"] else 0
+                except Exception:
+                    min_floor = 0
+                    
+                stmt = (
+                    insert(PlayerGameStat).values(
+                        game_id=game_id,
+                        player_id=player_stat_row["personId"],
+                        season=game_season,
+                        team_id=player_stat_row["teamId"],
+                        pos=player_stat_row["position"],
+                        min=min_floor,
+                        points=player_stat_row["points"],
+                        fgm=player_stat_row["fieldGoalsMade"],
+                        fga=player_stat_row["fieldGoalsAttempted"],
+                        fgp=player_stat_row["fieldGoalsPercentage"],
+                        ftm=player_stat_row["freeThrowsMade"],
+                        fta=player_stat_row["freeThrowsAttempted"],
+                        ftp=player_stat_row["freeThrowsPercentage"],
+                        tpm=player_stat_row["threePointersMade"],
+                        tpa=player_stat_row["threePointersAttempted"],
+                        tpp=player_stat_row["threePointersPercentage"],
+                        off_reb=player_stat_row["reboundsOffensive"],
+                        def_reb=player_stat_row["reboundsDefensive"],
+                        tot_reb=player_stat_row["reboundsTotal"],
+                        asts=player_stat_row["assists"],
+                        stls=player_stat_row["steals"],
+                        blks=player_stat_row["blocks"],
+                        tos=player_stat_row["turnovers"],
+                        pfs=player_stat_row["foulsPersonal"],
+                        plus_minus=player_stat_row["plusMinusPoints"]
+                    ).on_conflict_do_nothing()
+                )
+
+                result = await session.execute(stmt)
+                if result.rowcount == 1:
+                    processed_player_stats_pg += 1
+
+            for _, team_stat_row in team_stats.iterrows():
+                opponents = team_stats[team_stats["teamId"] != team_stat_row["teamId"]]
+
+                if len(opponents) != 1:
+                    raise InvalidGameData(f"Game ID ({game_id}) contains invalid data. Skipping.")
+
+                stmt = (
+                    insert(TeamGameStat).values(
+                        game_id=team_stat_row["gameId"],
+                        team_id=team_stat_row["teamId"],
+                        season=game_season,
+                        points=team_stat_row["points"],
+                        opponent_points = opponents["points"].iloc[0],
+                        rebounds=team_stat_row["reboundsTotal"],
+                        assists=team_stat_row["assists"],
+                        steals=team_stat_row["steals"],
+                        blocks=team_stat_row["blocks"],
+                        turnovers=team_stat_row["turnovers"],
+                        fg_pct=team_stat_row["fieldGoalsPercentage"],
+                        three_pct=team_stat_row["threePointersPercentage"],
+                        ft_pct=team_stat_row["freeThrowsPercentage"],
+                    ).on_conflict_do_nothing()
+                )
+
+                result = await session.execute(stmt)
+                if result.rowcount == 1:
+                    processed_team_stats_pg += 1
+
+            game = await session.get(Game, game_id)
+            game.status = 3
+
+            await session.commit()
+            processed_games += 1
+        except InvalidGameData as e:
+            await session.rollback()
+            logger.error("invalid_game", error=str(e))
+            continue
+
+        processed_player_stats += processed_player_stats_pg
+        processed_team_stats += processed_team_stats_pg
+
     return (processed_games, processed_player_stats, processed_team_stats)
 
 async def ingest_standings(session, season):

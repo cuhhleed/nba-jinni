@@ -30,7 +30,11 @@ async def engine():
 async def session(engine):
     async with engine.connect() as connection:
         await connection.begin()
-        async_session = AsyncSession(bind=connection, expire_on_commit=False)
+        async_session = AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
         yield async_session
         await connection.rollback()
 

@@ -119,14 +119,41 @@ module "lambda_ingestion" {
   role               = aws_iam_role.lambda_exec.arn
   handler            = "main.handler"
   timeout            = 300
+  memory_size        = 512
   subnet_ids         = module.vpc.public_subnet_ids
   security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
-    DB_HOST       = module.rds.endpoint
-    DB_NAME       = module.rds.db_name
-    DB_PORT       = module.rds.port
-    DB_SECRET_ARN = aws_secretsmanager_secret.db_credentials.arn
+    DB_HOST                     = module.rds.endpoint
+    DB_NAME                     = module.rds.db_name
+    DB_PORT                     = module.rds.port
+    DB_SECRET_ARN               = aws_secretsmanager_secret.db_credentials.arn
+    NBA_API_BACKOFF_THROTTLE    = "1.0"
+    NBA_API_CALL_COUNT_THROTTLE = "1.0"
+  }
+}
+
+module "lambda_ingestion_first_start" {
+  source = "../../modules/lambda"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  function_name      = "ingestion-first-start"
+  filename           = "../../placeholder_ingestion.zip"
+  role               = aws_iam_role.lambda_exec.arn
+  handler            = "main.handler"
+  timeout            = 900
+  memory_size        = 512
+  subnet_ids         = module.vpc.public_subnet_ids
+  security_group_ids = [module.lambda_security_group.security_group_id]
+
+  environment_variables = {
+    DB_HOST                     = module.rds.endpoint
+    DB_NAME                     = module.rds.db_name
+    DB_PORT                     = module.rds.port
+    DB_SECRET_ARN               = aws_secretsmanager_secret.db_credentials.arn
+    NBA_API_BACKOFF_THROTTLE    = "5.0"
+    NBA_API_CALL_COUNT_THROTTLE = "5.0"
   }
 }
 
@@ -167,6 +194,7 @@ module "event_bridge" {
   lambda_arn          = module.lambda_ingestion.arn
   rule_name           = "daily-ingestion-rule"
   schedule_expression = "cron(0 9 * * ? *)"
+  input               = jsonencode({ job = "games_stats_nightly" })
 }
 
 module "s3_frontend" {

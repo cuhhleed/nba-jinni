@@ -25,4 +25,10 @@ variable "lambda_arn" {
   type        = string
 }
 
+variable "input" {
+  description = "JSON payload to pass as the Lambda event (e.g. '{\"job\": \"games_stats_nightly\"}')."
+  type        = string
+  default     = null
+}
+
 
