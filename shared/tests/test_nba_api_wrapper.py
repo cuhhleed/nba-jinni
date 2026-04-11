@@ -109,3 +109,30 @@ def test_call_count_throttle(mock_sleep):
         wrapper.call(MockEndpointClass)
 
     mock_sleep.assert_called_once_with(5.0)
+
+@patch("time.sleep")
+def test_reconfigure_applies_new_throttles_to_subsequent_calls(mock_sleep):
+    MockEndpointClass = MagicMock()
+    MockEndpointClass.__name__ = "MockEndpoint"
+    MockEndpointClass.return_value.get_data_frames.side_effect = [
+        [MagicMock()],
+        requests.exceptions.RequestException("timeout"),
+        [MagicMock()],
+        *[[MagicMock()] for _ in range(8)],
+    ]
+
+    wrapper = NbaApiWrapper(back_off_throttle=1.0, call_count_throttle=1.0)
+
+    wrapper.call(MockEndpointClass)
+    assert mock_sleep.call_count == 0
+
+    wrapper.reconfigure(back_off_throttle=5.0, call_count_throttle=7.0)
+
+    wrapper.call(MockEndpointClass)
+    mock_sleep.assert_called_with(5.0)
+
+    for _ in range(8):
+        wrapper.call(MockEndpointClass)
+
+    mock_sleep.assert_called_with(7.0)
+    assert wrapper.call_count == 10

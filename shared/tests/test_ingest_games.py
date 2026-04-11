@@ -80,7 +80,7 @@ async def test_ingest_games_inserts_stats(session, test_season, test_home_team, 
             "points": 105, "rebounds": 38, "assists": 22,
             "steals": 6, "blocks": 3, "turnovers": 14,
             "fg_pct": 0.440, "three_pct": 0.340, "ft_pct": 0.780,
-        },
+        }
     ])
 
     with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, return_value=(player_df, team_df)):
@@ -125,7 +125,7 @@ async def test_ingest_games_multiple_games(session, test_season, test_home_team,
             "points": 102, "rebounds": 36, "assists": 20,
             "steals": 5, "blocks": 2, "turnovers": 15,
             "fg_pct": 0.430, "three_pct": 0.320, "ft_pct": 0.770,
-        },
+        }
     ])
 
     player_df_2 = make_player_stats_df([{
@@ -150,7 +150,7 @@ async def test_ingest_games_multiple_games(session, test_season, test_home_team,
             "points": 99, "rebounds": 35, "assists": 19,
             "steals": 4, "blocks": 1, "turnovers": 16,
             "fg_pct": 0.410, "three_pct": 0.300, "ft_pct": 0.750,
-        },
+        }
     ])
 
     with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, side_effect=[
@@ -218,7 +218,7 @@ async def test_ingest_games_skips_unknown_player(session, test_season, test_home
             "points": 105, "rebounds": 38, "assists": 22,
             "steals": 6, "blocks": 3, "turnovers": 14,
             "fg_pct": 0.440, "three_pct": 0.340, "ft_pct": 0.780,
-        },
+        }
     ])
 
     with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, return_value=(player_df, team_df)):
@@ -254,7 +254,7 @@ async def test_ingest_games_handles_empty_minutes(session, test_season, test_hom
             "points": 100, "rebounds": 42, "assists": 24,
             "steals": 7, "blocks": 4, "turnovers": 11,
             "fg_pct": 0.450, "three_pct": 0.350, "ft_pct": 0.800,
-        },
+        }
     ])
 
     with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, return_value=(player_df, team_df)):
@@ -287,7 +287,7 @@ async def test_ingest_games_opponent_points_cross_reference(session, test_season
             "points": 105, "rebounds": 38, "assists": 22,
             "steals": 6, "blocks": 3, "turnovers": 14,
             "fg_pct": 0.440, "three_pct": 0.340, "ft_pct": 0.780,
-        },
+        }
     ])
 
     with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, return_value=(player_df, team_df)):
@@ -302,3 +302,31 @@ async def test_ingest_games_opponent_points_cross_reference(session, test_season
     away_stat = next(s for s in team_stats if s.team_id == test_away_team.id)
     assert away_stat.points == 105
     assert away_stat.opponent_points == 110
+
+async def test_invalid_teams(session, test_season, test_home_team, test_player, test_game):
+    player_df = make_player_stats_df([{
+        "person_id": test_player.id, "team_id": test_player.team_id,
+        "position": "F", "minutes": "30:00", "points": 20,
+        "fgm": 8, "fga": 15, "fgp": 0.53,
+        "ftm": 3, "fta": 4, "ftp": 0.75,
+        "tpm": 1, "tpa": 3, "tpp": 0.333,
+        "off_reb": 2, "def_reb": 5, "tot_reb": 7,
+        "assists": 5, "steals": 1, "blocks": 1,
+        "turnovers": 3, "fouls": 2, "plus_minus": 10,
+    }])
+    invalid_team_df = make_team_stats_df([
+        {
+            "game_id": test_game.id, "team_id": test_home_team.id,
+            "points": 110, "rebounds": 42, "assists": 25,
+            "steals": 8, "blocks": 5, "turnovers": 12,
+            "fg_pct": 0.470, "three_pct": 0.380, "ft_pct": 0.820,
+        }
+    ])
+
+    with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, return_value=(player_df, invalid_team_df)):
+        games, players, teams = await ingest_games([test_game], session)
+
+    assert test_game.status == 1
+    assert games == 0
+    assert players == 0
+    assert teams == 0
