@@ -134,7 +134,7 @@ Three interrelated problems emerged when designing for both workloads:
 
 1. **AWS Lambda has a hard 15-minute timeout ceiling.** A full-season first-start run cannot fit in a single Lambda invocation regardless of throttle tuning. The original plan of "set a large timeout and let it run" is not viable.
 
-2. **NBA.com's informal rate limit tightens under sustained high call volume.** Testing during Story 4.3 showed that aggressive or default throttle timings (≤1s) resulted in retry exhaustion during large-volume runs. The NBA API requires *longer* pauses per call under high volume, not shorter — counterintuitive to standard rate-limit thinking. Empirically, 5–10s throttles were needed to complete full-season ingestion without exhausting retries.
+2. **NBA.com's informal rate limit tightens under sustained high call volume.** Testing during Story 4.3 showed that aggressive or default throttle timings (≤1s) resulted in retry exhaustion during large-volume runs. The NBA API requires _longer_ pauses per call under high volume, not shorter — counterintuitive to standard rate-limit thinking. Empirically, 5–10s throttles were needed to complete full-season ingestion without exhausting retries.
 
 3. **The original single-transaction model loses all partial progress on timeout.** `run_nightly()` wrapped `ingest_games()` and all downstream steps in one `session.begin()`. If the Lambda timed out mid-run, every partially-ingested game was rolled back. Combined with the fact that first-start requires multiple Lambda invocations to complete, this meant each invocation would restart from zero — making convergence impossible.
 
@@ -146,12 +146,12 @@ Four interlocking changes were made to resolve these problems:
 
 **1. Split into two Lambda functions.** The single `lambda_ingestion` module is supplemented by a new `lambda_ingestion_first_start` module, both deploying the same zip artifact but with different configurations:
 
-| | `daily-ingestion` | `ingestion-first-start` |
-|---|---|---|
-| Timeout | 300s | 900s (max) |
-| Memory | 512 MB | 512 MB |
-| Trigger | EventBridge cron (9 AM UTC) | Manual invocation only |
-| Throttle env vars | 1.0s / 1.0s | 5.0s / 5.0s |
+|                   | `daily-ingestion`           | `ingestion-first-start` |
+| ----------------- | --------------------------- | ----------------------- |
+| Timeout           | 300s                        | 900s (max)              |
+| Memory            | 512 MB                      | 512 MB                  |
+| Trigger           | EventBridge cron (9 AM UTC) | Manual invocation only  |
+| Throttle env vars | 1.0s / 1.0s                 | 5.0s / 5.0s             |
 
 Separating the two functions preserves duration-based observability on the nightly (an invocation over ~60s is anomalous and alertable), caps the hang/runaway blast radius on the short-running function, and gives the long-running first-start invocation the full 900s ceiling without polluting the nightly's metrics.
 
@@ -184,3 +184,145 @@ To preserve test isolation with per-game commits, the shared test session fixtur
 
 - Story 4.4 (Lambda packaging and deployment) should note that two Lambda functions are deployed from a single zip artifact, and that first-start requires manual sequential invocations to complete initial season backfill.
 - FEATURE-005 (historical season backfill) should be implemented within the `ingestion-first-start` Lambda or a sibling thereof — not in `daily-ingestion`.
+
+_Lambda topology superseded by ADR-005; per-game commit and throttle strategies remain in effect for local execution._
+
+---
+
+## ADR-005 — Hybrid local-cloud ingestion with S3-mediated sync
+
+**Date:** Epic 4 / Story 4.4  
+**Status:** Accepted
+
+### Context
+
+Story 4.4 (Lambda packaging and deployment) surfaced a fundamental networking constraint that blocks the original fully-serverless ingestion design.
+
+Lambda functions inside a VPC cannot reach the public internet without a NAT gateway. The ingestion Lambda requires both internet access to call the NBA.com API and VPC access to reach the RDS instance in a private subnet. The `map_public_ip_on_launch` setting on public subnets does not help — AWS Lambda uses Hyperplane ENIs that never receive public IPs regardless of subnet configuration.
+
+A managed NAT gateway would satisfy both requirements but costs approximately $32/month — disproportionate for a portfolio project where cost efficiency is a stated goal. Alternative approaches were considered:
+
+- **NAT instance (t4g.nano):** ~$3/month, but adds EC2 management overhead and single point of failure
+- **fck-nat AMI:** Same cost as NAT instance, pre-configured, but still requires EC2 management
+- **Split Lambda architecture:** One Lambda outside VPC for API calls, another inside VPC for DB writes — adds complexity and intermediate storage
+- **EC2-based ingestion:** ~$3/month, but changes the architecture entirely and adds instance management
+
+The chosen approach — local ingestion with S3-mediated sync — costs $0 in incremental AWS spend, reuses all existing ingestion code unchanged, and simplifies Lambda networking requirements.
+
+### Decision
+
+Replace the fully-serverless ingestion model with a hybrid local-cloud architecture. The data flow becomes:
+
+1. **Local cron** triggers ingestion jobs (nightly game stats, bi-weekly roster/schedule) on the developer's machine.
+2. **Ingestion pipeline** (existing code, completely unchanged) fetches from NBA.com API and upserts into local PostgreSQL running in Docker.
+3. **Export script** (new) queries each table from local PostgreSQL and writes JSON files to a local directory.
+4. **S3 upload** (new) pushes the JSON files to a designated S3 bucket.
+5. **Loader Lambda** (new) is triggered by S3 upload or manual invocation, downloads the JSON files, and performs truncate + insert into RDS.
+
+The Loader Lambda lives inside the VPC but requires only two things: access to RDS (via private subnet routing) and access to S3 (via a free VPC Gateway Endpoint). It does not need internet access, eliminating the NAT gateway requirement entirely.
+
+**Data format choice:** JSON was selected over CSV because `json.dump(default=str)` handles date, datetime, and decimal serialization automatically. On import, only date fields require parsing back — integers, booleans, and nulls survive the JSON round-trip as their native types. This results in approximately 20–30 fewer lines of type coercion code compared to CSV.
+
+**Load strategy choice:** Truncate + insert (full table replacement) was selected over row-by-row upsert for simplicity. This eliminates `ON CONFLICT` clause logic and primary key detection. The brief data unavailability during the truncate-insert window is acceptable if sync runs during off-hours. As a side benefit, the S3 JSON exports serve as daily point-in-time backups that can be used for recovery.
+
+**Table ordering:** Both export and import must respect foreign key dependencies. Tables are deleted in reverse dependency order (leaf tables first) and inserted in forward dependency order (root tables first): Season → Team → Player → Game → PlayerGameStats, TeamGameStats → PlayerSeasonAverages, TeamSeasonAverages → Standings.
+
+### Components Changed
+
+**Removed from scope:**
+
+- `lambda_ingestion` (daily-ingestion) — ingestion now runs locally, not in Lambda
+- `lambda_ingestion_first_start` — cold-start backfill handled locally
+- `event_bridge` module for ingestion cron — replaced by local cron scheduling
+- NAT gateway / NAT instance — Loader Lambda has no internet requirement
+
+**New components:**
+
+- `scripts/export_to_json.py` — queries local PostgreSQL, writes one JSON file per table
+- `scripts/upload_to_s3.py` — pushes JSON files to S3 (may be combined with export script)
+- `loader/` package — new Lambda that downloads JSON from S3 and loads into RDS
+- S3 bucket or prefix for data exports — stores JSON files with optional versioning for backup retention
+- S3 VPC Gateway Endpoint — added to `infra/modules/vpc/`, enables Lambda to reach S3 without NAT (free)
+
+**Modified components:**
+
+- `infra/environments/dev/main.tf` — remove `lambda_ingestion`, `lambda_ingestion_first_start`, and `event_bridge` module calls; add Loader Lambda module, S3 bucket resource, and S3 VPC endpoint
+- `infra/modules/vpc/main.tf` — add `aws_vpc_endpoint` resource for S3 gateway
+- `shared/nbajinni_shared/session.py` — must support Lambda environment by assembling `DATABASE_URL` from `DB_HOST`, `DB_PORT`, `DB_NAME` plus credentials from environment variables or Secrets Manager; this change is a shared prerequisite for both Loader Lambda and Backend Lambda
+
+**Unchanged components:**
+
+- `ingestion/main.py` — runs locally exactly as written, no modifications needed
+- `shared/nbajinni_shared/utils.py` — all ingestion logic unchanged
+- `shared/nbajinni_shared/models/*` — models reused by Loader Lambda for inserts
+- `lambda_backend` (request-handler) — unaffected, continues serving API from RDS
+- RDS instance configuration — remains in private subnet, no changes
+
+### Consequences
+
+**Positive:**
+
+- Zero incremental AWS cost for ingestion infrastructure — no NAT gateway, no always-on EC2, no EventBridge rules for ingestion scheduling.
+- Existing ingestion code runs completely unchanged — `ingestion/main.py` and all utility functions in `/shared` simply execute locally instead of in Lambda.
+- Daily backups as a side effect — S3 JSON exports provide point-in-time recovery at no additional effort or cost.
+- Faster local development iteration — ingestion runs directly on the dev machine with full debugger access, no Lambda deploy/invoke cycle required for testing.
+- Simpler Lambda networking — Loader Lambda needs only VPC-internal routing and S3 access, both of which are straightforward to configure.
+
+**Negative / Watch points:**
+
+- Data freshness depends on local machine availability — if the dev machine is offline during scheduled ingestion windows, data becomes stale until the next successful run. The ingestion is idempotent and will catch up, but real-time freshness is not guaranteed.
+- Manual operational step introduced — after local ingestion and export, the developer must upload to S3 and optionally trigger the Loader Lambda. This contrasts with the original fully-automated EventBridge design.
+- Brief data unavailability during sync — truncate + insert means tables are empty momentarily during the load window. Mitigated by running sync during off-hours when no users are active.
+- Historical data risk at local DB layer — if the local PostgreSQL container is lost and the NBA API has since removed data (e.g., stats for a retired player purged from the API), that data is unrecoverable unless restored from S3 JSON backups. Risk is mitigated by retaining S3 exports and by the fact that NBA rarely removes historical game data.
+
+**Reversibility:**
+
+This decision is fully reversible. If cost constraints relax (employer-sponsored AWS credits, paid tier budget, etc.), the original Lambda-based ingestion can be restored by adding a NAT gateway to the VPC, re-deploying `lambda_ingestion` and `lambda_ingestion_first_start` with the existing code, and re-enabling EventBridge cron triggers. The Loader Lambda and S3 sync infrastructure can be retained as a secondary mechanism or removed entirely.
+
+### Impact on project plan
+
+**Confirmed Stack table:**
+
+- Update the Ingestion row from "Python Lambda + EventBridge" to "Local Python + cron, S3 sync via Loader Lambda"
+
+**Repository Structure:**
+
+- Update `ingestion/` description from "Nightly Lambda data pipeline" to "Local ingestion pipeline (runs on dev machine)"
+- Add `loader/` directory with description "S3-to-RDS sync Lambda"
+- Add export and upload scripts to `scripts/`
+
+**Story 2.3 (Provision compute and API infrastructure):**
+
+- Remove task: "Write Terraform `lambda` module for the ingestion function (separate function)"
+- Remove task: "Write Terraform for EventBridge rule (nightly cron) triggering the ingestion Lambda"
+- Retain task: "Configure Lambda VPC settings so it can reach RDS" — applies to Loader Lambda and Backend Lambda
+- Add task: Write Terraform for Loader Lambda (VPC-attached, S3-triggered or manually invoked)
+- Add task: Write Terraform for S3 bucket for data exports
+- Add task: Write Terraform for S3 VPC Gateway Endpoint
+
+**Story 4.4 (Lambda packaging and deployment):**
+
+- Original scope is entirely obsolete; replace with new task list for Loader Lambda and sync infrastructure
+
+**Story 5.1 (FastAPI project structure):**
+
+- Add prerequisite: Update `shared/session.py` to support Lambda environment; this change is shared by both Loader Lambda and Backend Lambda
+
+**Story 7.3 (Backend API CI/CD):**
+
+- Add CI/CD for Loader Lambda deployment (package zip with `/shared`, deploy on merge to main)
+
+**Story 8.1 (End-to-end verification):**
+
+- Update verification flow: local ingestion → export JSON → upload to S3 → trigger Loader Lambda → verify data in RDS
+
+**Story 8.3 (Final documentation):**
+
+- Document hybrid architecture with updated diagram
+- Document local cron setup for ingestion scheduling
+- Document manual sync workflow (export → upload → invoke)
+- Document data recovery procedures using S3 JSON backups
+
+**Key Technical Decisions Log:**
+
+- Update "Data freshness" row from "Nightly Lambda (EventBridge)" to "Local cron + S3 sync — cost-optimized hybrid pattern"

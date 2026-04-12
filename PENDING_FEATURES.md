@@ -1,6 +1,6 @@
 # Pending Features & Architectural Improvements
 
-This document tracks features, refactors, and architectural improvements that have been identified during development but deferred for dedicated implementation.
+This document tracks features, refactors, and architectural improvements that have been identified during development but deferred for dedicated implementation. All features are implemented and merged from the `feature-001` branch.
 
 ---
 

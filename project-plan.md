@@ -13,7 +13,7 @@ A full-stack web application for viewing NBA player and team statistics, designe
 | Frontend       | React + TypeScript (Vite)   | Industry-standard, portfolio-visible, type safety       |
 | Backend API    | Python + FastAPI            | Shared language with ingestion, modern, auto-docs       |
 | Database       | PostgreSQL (AWS RDS)        | Relational data fits the domain, industry gold standard |
-| Ingestion      | Python Lambda + EventBridge | Serverless, free tier friendly, nightly schedule        |
+| Ingestion      | ~~Python Lambda + EventBridge~~ Local Python + cron, S3 sync via Loader Lambda [ADR-005] | ~~Serverless, free tier friendly, nightly schedule~~ Cost-optimized hybrid local-cloud [ADR-005] |
 | Hosting (FE)   | S3 + CloudFront             | Static hosting, effectively free                        |
 | Hosting (API)  | Lambda + API Gateway        | Serverless, free tier friendly                          |
 | IaC            | Terraform                   | Cloud-agnostic, widely recognized                       |
@@ -30,8 +30,10 @@ A full-stack web application for viewing NBA player and team statistics, designe
 /
 ├── frontend/          # React + TypeScript app
 ├── backend/           # FastAPI application
-├── ingestion/         # Nightly Lambda data pipeline
+├── ingestion/         # Local ingestion pipeline (runs on dev machine) [ADR-005]
+├── loader/            # S3-to-RDS sync Lambda [ADR-005]
 ├── shared/            # [ADR-001] Shared database models, utilities, and session initializer
+├── scripts/           # Export and upload scripts for S3 sync [ADR-005]
 ├── infra/             # Terraform configurations
 │   ├── modules/
 │   └── environments/
@@ -152,12 +154,15 @@ _As a developer, I want Lambda functions and API Gateway provisioned via Terrafo
 Tasks:
 
 - [x] Write Terraform `lambda` module for the backend API function (Python 3.12 runtime)
-- [x] Write Terraform `lambda` module for the ingestion function (separate function)
+- ~~[x] Write Terraform `lambda` module for the ingestion function (separate function)~~ _(superseded by [ADR-005] — ingestion runs locally)_
 - [x] Write Terraform for API Gateway (HTTP API) wired to the backend Lambda
-- [x] Write Terraform for EventBridge rule (nightly cron) triggering the ingestion Lambda
+- ~~[x] Write Terraform for EventBridge rule (nightly cron) triggering the ingestion Lambda~~ _(superseded by [ADR-005] — local cron replaces EventBridge)_
 - [x] Configure IAM roles: Lambda execution role with RDS access and Secrets Manager read
 - [x] Configure Lambda VPC settings so it can reach RDS in the private subnet
 - ~~[ ] Provision a Secrets Manager entry for the api-sports.io API key~~ _(superseded by [ADR-002] — no third-party API key required)_
+- [ ] Write Terraform for Loader Lambda (VPC-attached, S3-triggered or manually invoked) [ADR-005]
+- [ ] Write Terraform for S3 bucket for data exports [ADR-005]
+- [ ] Write Terraform for S3 VPC Gateway Endpoint [ADR-005]
 
 ---
 
@@ -265,17 +270,31 @@ Tasks:
 
 ---
 
-**Story 4.4 — Lambda packaging and deployment**
-_As a developer, I want the ingestion Lambda packaged and deployable via CI so it runs reliably in AWS._
+**Story 4.4 — ~~Lambda packaging and deployment~~ Loader Lambda and S3 sync infrastructure [ADR-005]**
+~~_As a developer, I want the ingestion Lambda packaged and deployable via CI so it runs reliably in AWS._~~
 
-Tasks:
+_As a developer, I want a Loader Lambda that syncs data from S3 to RDS, with supporting export scripts for local-to-cloud data transfer._ [ADR-005]
 
-- [ ] Configure Lambda handler entry point
-- [ ] Set up dependency packaging (Lambda layer or bundled zip)
-- [ ] Ensure `/shared` is bundled as part of the ingestion Lambda deployment zip [ADR-001]
-- [ ] Verify Lambda can connect to RDS inside the VPC
-- [ ] Add CloudWatch log group and structured logging
-- [ ] Manually trigger and verify a successful run end-to-end before automating
+~~Tasks (superseded by [ADR-005]):~~
+
+- ~~[ ] Configure Lambda handler entry point~~
+- ~~[ ] Set up dependency packaging (Lambda layer or bundled zip)~~
+- ~~[ ] Ensure `/shared` is bundled as part of the ingestion Lambda deployment zip [ADR-001]~~
+- ~~[ ] Verify Lambda can connect to RDS inside the VPC~~
+- ~~[ ] Add CloudWatch log group and structured logging~~
+- ~~[ ] Manually trigger and verify a successful run end-to-end before automating~~
+
+Tasks [ADR-005]:
+
+- [ ] Create JSON export script (`scripts/export_to_json.py`)
+- [ ] Create S3 upload script (`scripts/upload_to_s3.py`)
+- [ ] Create Loader Lambda handler (`loader/main.py`)
+- [ ] Package Loader Lambda with `/shared` dependency [ADR-001]
+- [ ] Update `shared/session.py` to support Lambda environment (assemble `DATABASE_URL` from env vars)
+- [ ] Verify Loader Lambda connects to RDS and loads data correctly
+- [ ] Add CloudWatch log group and structured logging for Loader Lambda
+- [ ] Document local cron setup for ingestion + export
+- [ ] Document manual sync workflow (export → upload → verify)
 
 ---
 
@@ -287,6 +306,8 @@ Tasks:
 
 **Story 5.1 — Project structure and database connectivity**
 _As a developer, I want a clean FastAPI project wired up to PostgreSQL so I have a solid foundation for building endpoints._
+
+_Prerequisite: `shared/session.py` Lambda environment support (Story 4.4) [ADR-005]_
 
 Tasks:
 
@@ -461,6 +482,7 @@ Tasks:
 - [ ] On merge to `main`: package Lambda zip, run `alembic upgrade head` against RDS, deploy zip to Lambda via AWS CLI
 - [ ] Ensure the backend Lambda zip includes `/shared` as a bundled dependency [ADR-001]
 - [ ] Store DB connection string and Lambda function name as GitHub Actions secrets
+- [ ] Add CI/CD for Loader Lambda deployment (package zip with `/shared`, deploy on merge to main) [ADR-005]
 
 ---
 
@@ -487,7 +509,8 @@ _As a developer, I want to verify that data flows correctly from the API through
 
 Tasks:
 
-- [ ] Trigger ingestion Lambda manually and verify data lands in RDS
+- ~~[ ] Trigger ingestion Lambda manually and verify data lands in RDS~~ _(superseded by [ADR-005])_
+- [ ] Run local ingestion → export JSON → upload to S3 → trigger Loader Lambda → verify data lands in RDS [ADR-005]
 - [ ] Call each backend API endpoint via the deployed API Gateway URL and verify correct responses
 - [ ] Open the deployed frontend and exercise every view end-to-end
 - [ ] Verify auth flow (register → login → protected route → logout)
@@ -516,6 +539,10 @@ Tasks:
 - [ ] Add architecture diagram (draw.io or Excalidraw — export as PNG, commit to repo)
 - [ ] Add screenshots of the running frontend to the README
 - [ ] Add inline code comments to complex sections (ingestion strategy, schema design decisions)
+- [ ] Document hybrid local-cloud architecture with updated diagram [ADR-005]
+- [ ] Document local cron setup for ingestion scheduling [ADR-005]
+- [ ] Document manual sync workflow (export → upload → invoke) [ADR-005]
+- [ ] Document data recovery procedures using S3 JSON backups [ADR-005]
 
 ---
 
@@ -546,6 +573,6 @@ Tasks:
 | IaC                   | Terraform                    | Cloud-agnostic; widely recognized across employers                                                                               |
 | CI/CD                 | GitHub Actions               | Lives in repo; OIDC AWS auth; highly visible to employers                                                                        |
 | Repo structure        | Monorepo                     | Solo project; reduces friction; unified CI/CD                                                                                    |
-| Data freshness        | Nightly Lambda (EventBridge) | Fits API call budget; serverless; clean pattern                                                                                  |
+| Data freshness        | ~~Nightly Lambda (EventBridge)~~ Local cron + S3 sync [ADR-005] | ~~Fits API call budget; serverless; clean pattern~~ Cost-optimized hybrid local-cloud; zero incremental AWS cost [ADR-005] |
 | Shared code (ADR-001) | `/shared` package            | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                              |
 | Data source (ADR-002) | `nba_api` Python package     | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost |
