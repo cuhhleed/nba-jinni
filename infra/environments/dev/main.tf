@@ -109,54 +109,6 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-module "lambda_ingestion" {
-  source = "../../modules/lambda"
-
-  project_name       = var.project_name
-  environment        = var.environment
-  function_name      = "daily-ingestion"
-  filename           = "../../placeholder_ingestion.zip"
-  role               = aws_iam_role.lambda_exec.arn
-  handler            = "main.handler"
-  timeout            = 300
-  memory_size        = 512
-  subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.lambda_security_group.security_group_id]
-
-  environment_variables = {
-    DB_HOST                     = module.rds.endpoint
-    DB_NAME                     = module.rds.db_name
-    DB_PORT                     = module.rds.port
-    DB_SECRET_ARN               = aws_secretsmanager_secret.db_credentials.arn
-    NBA_API_BACKOFF_THROTTLE    = "1.0"
-    NBA_API_CALL_COUNT_THROTTLE = "1.0"
-  }
-}
-
-module "lambda_ingestion_first_start" {
-  source = "../../modules/lambda"
-
-  project_name       = var.project_name
-  environment        = var.environment
-  function_name      = "ingestion-first-start"
-  filename           = "../../placeholder_ingestion.zip"
-  role               = aws_iam_role.lambda_exec.arn
-  handler            = "main.handler"
-  timeout            = 900
-  memory_size        = 512
-  subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.lambda_security_group.security_group_id]
-
-  environment_variables = {
-    DB_HOST                     = module.rds.endpoint
-    DB_NAME                     = module.rds.db_name
-    DB_PORT                     = module.rds.port
-    DB_SECRET_ARN               = aws_secretsmanager_secret.db_credentials.arn
-    NBA_API_BACKOFF_THROTTLE    = "5.0"
-    NBA_API_CALL_COUNT_THROTTLE = "5.0"
-  }
-}
-
 module "lambda_backend" {
   source = "../../modules/lambda"
 
@@ -170,10 +122,10 @@ module "lambda_backend" {
   security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
-    DB_HOST       = module.rds.endpoint
-    DB_NAME       = module.rds.db_name
-    DB_PORT       = module.rds.port
-    DB_SECRET_ARN = aws_secretsmanager_secret.db_credentials.arn
+    DB_HOST     = module.rds.endpoint
+    DB_NAME     = module.rds.db_name
+    DB_USER     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
+    DB_PASSWORD = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
   }
 }
 
@@ -184,17 +136,6 @@ module "api_gateway" {
   environment       = var.environment
   lambda_invoke_arn = module.lambda_backend.invoke_arn
   lambda_arn        = module.lambda_backend.arn
-}
-
-module "event_bridge" {
-  source = "../../modules/event_bridge"
-
-  project_name        = var.project_name
-  environment         = var.environment
-  lambda_arn          = module.lambda_ingestion.arn
-  rule_name           = "daily-ingestion-rule"
-  schedule_expression = "cron(0 9 * * ? *)"
-  input               = jsonencode({ job = "games_stats_nightly" })
 }
 
 module "s3_frontend" {
@@ -238,5 +179,51 @@ resource "aws_s3_bucket_policy" "s3-policy-frontend" {
       }
     }]
   })
+}
+
+module "s3_data_exports" {
+  source       = "../../modules/s3"
+  project_name = var.project_name
+  environment  = var.environment
+  bucket_name  = "data-exports"
+}
+
+resource "aws_iam_policy" "lambda_s3" {
+  name = "${var.project_name}-${var.environment}-lambda-s3-access"
+  policy = templatefile("${path.root}/../../policies/lambda_s3_policy.json.tpl", {
+    bucket_arn = module.s3_data_exports.bucket_arn
+  })
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-lambda-s3-policy"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_s3_attach" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.lambda_s3.arn
+}
+
+module "lambda_loader" {
+  source = "../../modules/lambda"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  function_name      = "data-loader"
+  filename           = "../../loader.zip"
+  role               = aws_iam_role.lambda_exec.arn
+  handler            = "main.handler"
+  timeout            = 300
+  memory_size        = 512
+  subnet_ids         = module.vpc.private_subnet_ids
+  security_group_ids = [module.lambda_security_group.security_group_id]
+
+  environment_variables = {
+    DB_HOST          = module.rds.endpoint
+    DB_NAME          = module.rds.db_name
+    DB_USER          = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
+    DB_PASSWORD      = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
+    DATA_BUCKET_NAME = module.s3_data_exports.bucket_id
+  }
 }
 

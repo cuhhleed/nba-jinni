@@ -9,7 +9,7 @@ resource "aws_cloudwatch_log_group" "lambda_log" {
 
 resource "aws_lambda_function" "main" {
   filename                           = var.filename
-  function_name                      = var.function_name
+  function_name                      = "${var.project_name}-${var.environment}-${var.function_name}"
   role                               = var.role
   runtime                            = "python3.12"
   handler                            = var.handler

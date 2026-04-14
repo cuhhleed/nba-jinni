@@ -1,13 +1,24 @@
 import os
-from pathlib import Path
 
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+_in_lambda = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+if not _in_lambda:
+    from dotenv import load_dotenv
+    load_dotenv()  # Searches upward from CWD for .env
+
+def _build_database_url():
+    if _in_lambda:
+        user = os.environ["DB_USER"]
+        password = os.environ["DB_PASSWORD"]
+        endpoint = os.environ["DB_HOST"]  # host:port format from RDS
+        name = os.environ["DB_NAME"]
+        return f"postgresql+asyncpg://{user}:{password}@{endpoint}/{name}"
+    return os.getenv("DATABASE_URL")
+
+DATABASE_URL = _build_database_url()
 
 def get_session_factory(database_url=None):
     if database_url == "test":
@@ -16,7 +27,7 @@ def get_session_factory(database_url=None):
         url = database_url
     else:
         url = DATABASE_URL
-    
+
     engine = create_async_engine(url, echo=False)
     return sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False

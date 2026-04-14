@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "nbajinni-scripts"
+version = "0.1.0"
+description = "NBAJinni local scripts for data export and S3 upload"
+authors = ["Your Name <you@example.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+boto3 = "^1.38.0"
+python-dotenv = "^1.0.0"
+structlog = "^25.5.0"
+nbajinni-shared = { path = "../shared", develop = true }

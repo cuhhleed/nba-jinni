@@ -69,4 +69,8 @@ secrets/
 *.zip
 layer/
 
+# ── Data exports (ADR-005) ────────────────────────────────
+data/exports/
+loader/dist/
+
 .claude/
