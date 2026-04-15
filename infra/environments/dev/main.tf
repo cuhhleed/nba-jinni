@@ -188,6 +188,29 @@ module "s3_data_exports" {
   bucket_name  = "data-exports"
 }
 
+resource "aws_s3_bucket_versioning" "data_exports" {
+  bucket = module.s3_data_exports.bucket_id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "data_exports" {
+  bucket = module.s3_data_exports.bucket_id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      newer_noncurrent_versions = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.data_exports]
+}
+
 resource "aws_iam_policy" "lambda_s3" {
   name = "${var.project_name}-${var.environment}-lambda-s3-access"
   policy = templatefile("${path.root}/../../policies/lambda_s3_policy.json.tpl", {

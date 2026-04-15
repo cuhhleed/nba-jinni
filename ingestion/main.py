@@ -104,4 +104,5 @@ async def run_first_start():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_nightly())
+    print("Use: poetry run python cli.py <job>")
+    print("Jobs: nightly, roster, schedule, first-start")

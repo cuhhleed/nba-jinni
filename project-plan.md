@@ -8,19 +8,19 @@ A full-stack web application for viewing NBA player and team statistics, designe
 
 ## Confirmed Stack
 
-| Layer          | Technology                  | Rationale                                               |
-| -------------- | --------------------------- | ------------------------------------------------------- |
-| Frontend       | React + TypeScript (Vite)   | Industry-standard, portfolio-visible, type safety       |
-| Backend API    | Python + FastAPI            | Shared language with ingestion, modern, auto-docs       |
-| Database       | PostgreSQL (AWS RDS)        | Relational data fits the domain, industry gold standard |
+| Layer          | Technology                                                                               | Rationale                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Frontend       | React + TypeScript (Vite)                                                                | Industry-standard, portfolio-visible, type safety                                                |
+| Backend API    | Python + FastAPI                                                                         | Shared language with ingestion, modern, auto-docs                                                |
+| Database       | PostgreSQL (AWS RDS)                                                                     | Relational data fits the domain, industry gold standard                                          |
 | Ingestion      | ~~Python Lambda + EventBridge~~ Local Python + cron, S3 sync via Loader Lambda [ADR-005] | ~~Serverless, free tier friendly, nightly schedule~~ Cost-optimized hybrid local-cloud [ADR-005] |
-| Hosting (FE)   | S3 + CloudFront             | Static hosting, effectively free                        |
-| Hosting (API)  | Lambda + API Gateway        | Serverless, free tier friendly                          |
-| IaC            | Terraform                   | Cloud-agnostic, widely recognized                       |
-| CI/CD          | GitHub Actions              | Native to repo, employer visible, AWS OIDC integration  |
-| Auth           | JWT (email/password)        | Simple, standard, no third-party dependency             |
-| Migrations     | Alembic                     | Python-native, pairs with SQLAlchemy                    |
-| Repo Structure | Monorepo                    | Solo project, single pipeline, clean folder separation  |
+| Hosting (FE)   | S3 + CloudFront                                                                          | Static hosting, effectively free                                                                 |
+| Hosting (API)  | Lambda + API Gateway                                                                     | Serverless, free tier friendly                                                                   |
+| IaC            | Terraform                                                                                | Cloud-agnostic, widely recognized                                                                |
+| CI/CD          | GitHub Actions                                                                           | Native to repo, employer visible, AWS OIDC integration                                           |
+| Auth           | JWT (email/password)                                                                     | Simple, standard, no third-party dependency                                                      |
+| Migrations     | Alembic                                                                                  | Python-native, pairs with SQLAlchemy                                                             |
+| Repo Structure | Monorepo                                                                                 | Solo project, single pipeline, clean folder separation                                           |
 
 ---
 
@@ -286,15 +286,15 @@ _As a developer, I want a Loader Lambda that syncs data from S3 to RDS, with sup
 
 Tasks [ADR-005]:
 
-- [ ] Create JSON export script (`scripts/export_to_json.py`)
-- [ ] Create S3 upload script (`scripts/upload_to_s3.py`)
-- [ ] Create Loader Lambda handler (`loader/main.py`)
-- [ ] Package Loader Lambda with `/shared` dependency [ADR-001]
-- [ ] Update `shared/session.py` to support Lambda environment (assemble `DATABASE_URL` from env vars)
-- [ ] Verify Loader Lambda connects to RDS and loads data correctly
-- [ ] Add CloudWatch log group and structured logging for Loader Lambda
-- [ ] Document local cron setup for ingestion + export
-- [ ] Document manual sync workflow (export → upload → verify)
+- [x] Create JSON export script (`scripts/export_to_json.py`)
+- [x] Create S3 upload script (`scripts/upload_to_s3.py`)
+- [x] Create Loader Lambda handler (`loader/main.py`)
+- [x] Package Loader Lambda with `/shared` dependency [ADR-001]
+- [x] Update `shared/session.py` to support Lambda environment (assemble `DATABASE_URL` from env vars)
+- [x] Verify Loader Lambda connects to RDS and loads data correctly
+- [x] Add CloudWatch log group and structured logging for Loader Lambda
+- [x] Document local cron setup for ingestion + export
+- [x] Document manual sync workflow (export → upload → verify)
 
 ---
 
@@ -561,18 +561,18 @@ Tasks:
 
 ## Key Technical Decisions Log
 
-| Decision              | Choice                       | Rationale                                                                                                                        |
-| --------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Frontend framework    | React + TypeScript           | Most employer-recognizable; TypeScript signals maturity                                                                          |
-| Backend language      | Python + FastAPI             | Shared with ingestion; modern, fast, auto-docs                                                                                   |
-| Database              | PostgreSQL (RDS)             | Relational model fits domain; industry standard                                                                                  |
-| ORM                   | SQLAlchemy + Alembic         | Python standard; migration workflow is a portfolio skill                                                                         |
-| Auth                  | JWT (custom)                 | No external dependency; demonstrates understanding of auth fundamentals                                                          |
-| API compute           | Lambda + API Gateway         | Free tier; serverless pattern worth knowing                                                                                      |
-| Frontend hosting      | S3 + CloudFront              | Effectively free; standard static hosting pattern                                                                                |
-| IaC                   | Terraform                    | Cloud-agnostic; widely recognized across employers                                                                               |
-| CI/CD                 | GitHub Actions               | Lives in repo; OIDC AWS auth; highly visible to employers                                                                        |
-| Repo structure        | Monorepo                     | Solo project; reduces friction; unified CI/CD                                                                                    |
-| Data freshness        | ~~Nightly Lambda (EventBridge)~~ Local cron + S3 sync [ADR-005] | ~~Fits API call budget; serverless; clean pattern~~ Cost-optimized hybrid local-cloud; zero incremental AWS cost [ADR-005] |
-| Shared code (ADR-001) | `/shared` package            | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                              |
-| Data source (ADR-002) | `nba_api` Python package     | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost |
+| Decision              | Choice                                                          | Rationale                                                                                                                        |
+| --------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend framework    | React + TypeScript                                              | Most employer-recognizable; TypeScript signals maturity                                                                          |
+| Backend language      | Python + FastAPI                                                | Shared with ingestion; modern, fast, auto-docs                                                                                   |
+| Database              | PostgreSQL (RDS)                                                | Relational model fits domain; industry standard                                                                                  |
+| ORM                   | SQLAlchemy + Alembic                                            | Python standard; migration workflow is a portfolio skill                                                                         |
+| Auth                  | JWT (custom)                                                    | No external dependency; demonstrates understanding of auth fundamentals                                                          |
+| API compute           | Lambda + API Gateway                                            | Free tier; serverless pattern worth knowing                                                                                      |
+| Frontend hosting      | S3 + CloudFront                                                 | Effectively free; standard static hosting pattern                                                                                |
+| IaC                   | Terraform                                                       | Cloud-agnostic; widely recognized across employers                                                                               |
+| CI/CD                 | GitHub Actions                                                  | Lives in repo; OIDC AWS auth; highly visible to employers                                                                        |
+| Repo structure        | Monorepo                                                        | Solo project; reduces friction; unified CI/CD                                                                                    |
+| Data freshness        | ~~Nightly Lambda (EventBridge)~~ Local cron + S3 sync [ADR-005] | ~~Fits API call budget; serverless; clean pattern~~ Cost-optimized hybrid local-cloud; zero incremental AWS cost [ADR-005]       |
+| Shared code (ADR-001) | `/shared` package                                               | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                              |
+| Data source (ADR-002) | `nba_api` Python package                                        | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost |
