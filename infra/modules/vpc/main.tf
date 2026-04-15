@@ -147,3 +147,15 @@ resource "aws_default_security_group" "default" {
     Name = "${var.project_name}-${var.environment}-default-sg"
   }
 }
+
+# S3 VPC Gateway Endpoint (ADR-005) - Enables Lambda in private subnets to access S3
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private_route_table.id]
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-s3-vpce"
+  }
+}

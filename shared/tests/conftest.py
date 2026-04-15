@@ -12,9 +12,8 @@ from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 import os
 from datetime import date
 from dotenv import load_dotenv
-from pathlib import Path
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv()  # Searches upward from CWD for .env
 
 
 # Session-scoped engine — connection pool created once for the entire test run

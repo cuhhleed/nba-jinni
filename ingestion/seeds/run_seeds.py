@@ -1,12 +1,12 @@
 import asyncio
-from pathlib import Path
 
 from dotenv import load_dotenv
+
+load_dotenv()  # Searches upward from CWD for .env
+
 from seed_players import main as seed_players
 from seed_seasons import main as seed_seasons
 from seed_teams import main as seed_teams
-
-load_dotenv(Path(__file__).parent.parent / ".env")
 
 
 async def main(env="dev"):

@@ -1,8 +1,9 @@
 import asyncio
 import os
 
-from dotenv import load_dotenv
-load_dotenv()
+if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    from dotenv import load_dotenv
+    load_dotenv()
 
 from logging.config import fileConfig
 
@@ -24,10 +25,13 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def get_url() -> str:
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        return None
-    return url
+    if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        user = os.environ["DB_USER"]
+        password = os.environ["DB_PASSWORD"]
+        endpoint = os.environ["DB_HOST"]
+        name = os.environ["DB_NAME"]
+        return f"postgresql+asyncpg://{user}:{password}@{endpoint}/{name}"
+    return os.getenv("DATABASE_URL")
 
 
 def run_migrations_offline() -> None:

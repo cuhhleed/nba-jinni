@@ -3,13 +3,14 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$SCRIPT_DIR/../infra/environments/dev"
-SECRET_ID=$(terraform output -raw db_credentials_secret_id)
 
 echo "==> Switching to Terraform environment: $INFRA_DIR"
 cd "$INFRA_DIR"
 
-echo "==> Building targeted destroy list (excluding module.vpc)..."
-TARGETS=$(terraform state list 2>/dev/null | grep -v "^module\.vpc" | sed 's/^/-target=/' | tr '\n' ' ')
+SECRET_ID=$(terraform output -raw db_secret_arn)
+
+echo "==> Building targeted destroy list (excluding module.vpc and module.s3*)..."
+TARGETS=$(terraform state list 2>/dev/null | grep -v "^module\.vpc" | grep -v "^module\.s3" | sed 's/^/-target=/' | tr '\n' ' ')
 
 if [ -z "$TARGETS" ]; then
   echo "No targets found in state. Nothing to destroy."
@@ -18,7 +19,7 @@ fi
 
 echo ""
 echo "Resources to be destroyed:"
-terraform state list | grep -v "^module\.vpc"
+terraform state list | grep -v "^module\.vpc" | grep -v "^module\.s3"
 echo ""
 read -p "Proceed with destroy? (yes/no): " CONFIRM
 

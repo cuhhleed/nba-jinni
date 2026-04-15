@@ -13,6 +13,7 @@ structlog = "^25.5.0"
 nba-api = "^1.11.4"
 pandas = "^3.0.2"
 asyncpg = "^0.31.0"
+alembic = "^1.13.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
@@ -22,3 +23,6 @@ dotenv = "^0.9.9"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.setuptools.packages.find]                                                                                                                                                                                                                                                 
+include = ["nbajinni_shared", "nbajinni_shared.*"]

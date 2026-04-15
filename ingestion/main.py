@@ -1,16 +1,17 @@
 import asyncio
-from pathlib import Path
+from datetime import date
 
 from dotenv import load_dotenv
-from datetime import date
+from sqlalchemy import select
+
+load_dotenv()  # Searches upward from CWD for .env
+
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.session import AsyncSessionLocal
 from nbajinni_shared.utils import get_current_season, ingest_games, compute_player_averages, compute_team_averages, ingest_standings, ingest_roster, ingest_schedule
 from nbajinni_shared.utils import wrapper
-from sqlalchemy import select
 
-load_dotenv(Path(__file__).parent / ".env")
 configure_logging()
 logger = get_logger("ingestion")
 
@@ -103,4 +104,4 @@ async def run_first_start():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_first_start())
+    asyncio.run(run_nightly())

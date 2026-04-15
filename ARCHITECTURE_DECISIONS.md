@@ -217,7 +217,9 @@ Replace the fully-serverless ingestion model with a hybrid local-cloud architect
 2. **Ingestion pipeline** (existing code, completely unchanged) fetches from NBA.com API and upserts into local PostgreSQL running in Docker.
 3. **Export script** (new) queries each table from local PostgreSQL and writes JSON files to a local directory.
 4. **S3 upload** (new) pushes the JSON files to a designated S3 bucket.
-5. **Loader Lambda** (new) is triggered by S3 upload or manual invocation, downloads the JSON files, and performs truncate + insert into RDS.
+5. **Loader Lambda** (new) is triggered by manual invocation, downloads the JSON files, and performs truncate + insert into RDS. The Lambda supports two actions via the event payload:
+   - `{"action": "load"}` — truncate + insert data from S3 JSON exports
+   - `{"action": "migrate"}` — run Alembic migrations against RDS before loading data (used on first deploy or schema changes)
 
 The Loader Lambda lives inside the VPC but requires only two things: access to RDS (via private subnet routing) and access to S3 (via a free VPC Gateway Endpoint). It does not need internet access, eliminating the NAT gateway requirement entirely.
 
@@ -240,7 +242,8 @@ The Loader Lambda lives inside the VPC but requires only two things: access to R
 
 - `scripts/export_to_json.py` — queries local PostgreSQL, writes one JSON file per table
 - `scripts/upload_to_s3.py` — pushes JSON files to S3 (may be combined with export script)
-- `loader/` package — new Lambda that downloads JSON from S3 and loads into RDS
+- `scripts/package_loader.sh` — builds the Loader Lambda deployment zip, bundling `/shared` and Alembic artifacts
+- `loader/` package — new Lambda that downloads JSON from S3 and loads into RDS; includes `migrate` action for schema management
 - S3 bucket or prefix for data exports — stores JSON files with optional versioning for backup retention
 - S3 VPC Gateway Endpoint — added to `infra/modules/vpc/`, enables Lambda to reach S3 without NAT (free)
 
@@ -249,6 +252,7 @@ The Loader Lambda lives inside the VPC but requires only two things: access to R
 - `infra/environments/dev/main.tf` — remove `lambda_ingestion`, `lambda_ingestion_first_start`, and `event_bridge` module calls; add Loader Lambda module, S3 bucket resource, and S3 VPC endpoint
 - `infra/modules/vpc/main.tf` — add `aws_vpc_endpoint` resource for S3 gateway
 - `shared/nbajinni_shared/session.py` — must support Lambda environment by assembling `DATABASE_URL` from `DB_HOST`, `DB_PORT`, `DB_NAME` plus credentials from environment variables or Secrets Manager; this change is a shared prerequisite for both Loader Lambda and Backend Lambda
+- `shared/alembic/` — Alembic configuration and migrations relocated from `backend/alembic/` to `/shared`. Both the Loader Lambda (for RDS schema management) and local development now reference the same migration history. The Loader Lambda bundles `alembic.ini` and the `alembic/` directory in its deployment artifact.
 
 **Unchanged components:**
 
