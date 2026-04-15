@@ -203,7 +203,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "data_exports" {
     id     = "expire-old-versions"
     status = "Enabled"
     filter {
-      prefix = "tmp/"
+      prefix = "exports/"
     }
 
     noncurrent_version_expiration {
