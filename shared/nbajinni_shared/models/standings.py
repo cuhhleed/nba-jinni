@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy import ForeignKey
 from sqlalchemy import Numeric
 from nbajinni_shared.base import Base
@@ -27,3 +27,6 @@ class Standing(Base):
     points_pg: Mapped[float] = mapped_column(Numeric(5, 1))
     opp_points_pg: Mapped[float] = mapped_column(Numeric(5, 1))
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
+
+    # relationship for bi-directionality
+    team: Mapped["Team"] = relationship("Team", back_populates="standing")
