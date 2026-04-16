@@ -1,20 +1,17 @@
 import asyncio
 from datetime import date
-
-from dotenv import load_dotenv
 from sqlalchemy import select
-
-load_dotenv()  # Searches upward from CWD for .env
 
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.games import Game
-from nbajinni_shared.session import AsyncSessionLocal
+from nbajinni_shared.session import get_session_factory
 from nbajinni_shared.utils import get_current_season, ingest_games, compute_player_averages, compute_team_averages, ingest_standings, ingest_roster, ingest_schedule
 from nbajinni_shared.utils import wrapper
 
 configure_logging()
 logger = get_logger("ingestion")
 
+AsyncSessionLocal = get_session_factory()
 
 def handler(event, context):
     job = event.get("job")

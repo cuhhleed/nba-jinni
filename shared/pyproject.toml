@@ -24,5 +24,6 @@ dotenv = "^0.9.9"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
-[tool.setuptools.packages.find]                                                                                                                                                                                                                                                 
-include = ["nbajinni_shared", "nbajinni_shared.*"]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

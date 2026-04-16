@@ -23,14 +23,14 @@ DATABASE_URL = _build_database_url()
 def get_session_factory(database_url=None):
     if database_url == "test":
         url = os.getenv("TEST_DATABASE_URL")
+    elif database_url == "dev":
+        url = DATABASE_URL
     elif database_url:
         url = database_url
     else:
         url = DATABASE_URL
 
-    engine = create_async_engine(url, echo=False)
+    engine = create_async_engine(url, echo=False, pool_size=1)
     return sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False
     )
-
-AsyncSessionLocal = get_session_factory()
