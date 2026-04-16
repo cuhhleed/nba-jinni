@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy import ForeignKey
 from sqlalchemy import Numeric
 from sqlalchemy import UniqueConstraint
@@ -22,3 +22,6 @@ class TeamSeasonAverage(Base):
     fg_pct: Mapped[float] = mapped_column(Numeric(5, 3))
     three_pct: Mapped[float] = mapped_column(Numeric(5, 3))
     ft_pct: Mapped[float] = mapped_column(Numeric(5, 3))
+
+    # relationship for bi-directionality
+    team: Mapped["Team"] = relationship("Team", back_populates="season_averages")

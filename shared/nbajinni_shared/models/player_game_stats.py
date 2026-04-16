@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy import ForeignKey
 from sqlalchemy import Numeric
 from nbajinni_shared.base import Base
@@ -32,3 +32,8 @@ class PlayerGameStat(Base):
     ftp: Mapped[float] = mapped_column(Numeric(5, 2))
     tpp: Mapped[float] = mapped_column(Numeric(5, 2))
     plus_minus: Mapped[int] = mapped_column()
+
+    # relationships for bi-directionality
+    player: Mapped["Player"] = relationship("Player", back_populates="game_stats")
+    game: Mapped["Game"] = relationship("Game", back_populates="player_stats")
+    team: Mapped["Team"] = relationship("Team")  # One-way, no back_populates needed
