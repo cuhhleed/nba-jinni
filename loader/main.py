@@ -15,10 +15,12 @@ import boto3
 from sqlalchemy import text
 
 from nbajinni_shared.logging import configure_logging, get_logger
-from nbajinni_shared.session import AsyncSessionLocal
+from nbajinni_shared.session import get_session_factory
 
 configure_logging()
 logger = get_logger("loader")
+
+AsyncSessionLocal = get_session_factory()
 
 S3_PREFIX = "exports"
 

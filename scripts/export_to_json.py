@@ -18,7 +18,7 @@ from uuid import UUID
 from sqlalchemy import text
 
 from nbajinni_shared.logging import configure_logging, get_logger
-from nbajinni_shared.session import AsyncSessionLocal
+from nbajinni_shared.session import get_session_factory
 
 configure_logging()
 logger = get_logger("export")
@@ -69,6 +69,7 @@ async def export_table(session, table_name: str) -> list[dict]:
 
 async def main():
     temp_dir = Path(tempfile.mkdtemp(prefix="export_"))
+    AsyncSessionLocal = get_session_factory()
 
     try:
         async with AsyncSessionLocal() as session:

@@ -3,12 +3,20 @@ from nba_api.stats.endpoints import LeagueStandingsV3
 from nba_api.stats.static import teams as nba_teams
 from nbajinni_shared.models.teams import Team
 from nbajinni_shared.session import get_session_factory
+from nbajinni_shared.logging import configure_logging, get_logger
 from sqlalchemy.dialects.postgresql import insert
 
+configure_logging()
+logger = get_logger("teams_seeding")
 
 async def main(env="dev"):
+    logger.info("seeding_teams", environment=env)
     teams = get_teams()
-    conferences = await get_conference_map()
+    try:
+        conferences = await get_conference_map()
+    except Exception as e:
+        logger.error("conferences_fetch_failed", error=str(e))
+        raise
     await upsert_teams(teams, conferences, env)
 
 
@@ -51,17 +59,24 @@ async def upsert_teams(teams, conference_map, env):
                         },
                     )
                 )
-                result = await session.execute(stmt)
+
+                try:
+                    result = await session.execute(stmt)
+                except Exception as e:
+                    logger.error("player_insert_failed",
+                                    team_id=team["id"],
+                                    team_name=team["full_name"],
+                                    environment=env,
+                                    error=str(e))
+                    raise
+
                 if result.rowcount == 1:
                     inserted += 1
                 else:
                     skipped += 1
 
-    print(
-        f"Teams Seeding Completed. Teams seeded: {inserted} inserted, "
-        f"{skipped} already existed"
-    )
-
+    logger.info("team_seeding_completed", 
+                message=f"Teams Seeding Completed. Teams seeded: {inserted} inserted, {skipped} already existed")
 
 if __name__ == "__main__":
     import argparse

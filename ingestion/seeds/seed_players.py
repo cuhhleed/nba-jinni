@@ -2,13 +2,21 @@ import asyncio
 
 from nbajinni_shared.models.players import Player
 from nbajinni_shared.session import get_session_factory
+from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.utils import get_all_players, get_current_season
 from sqlalchemy.dialects.postgresql import insert
 
+configure_logging()
+logger = get_logger("players_seeding")
 
 async def main(env="dev"):
+    logger.info("seeding_players", environment=env)
     current_season = get_current_season()
-    players = await get_all_players(current_season)
+    try:
+        players = await get_all_players(current_season)
+    except Exception as e:
+        logger.error("players_fetch_failed", error=str(e))
+        raise
     await upsert_players(players, env)
 
 
@@ -47,16 +55,24 @@ async def upsert_players(players, env):
                         },
                     )
                 )
-                result = await session.execute(stmt)
+
+                try:
+                    result = await session.execute(stmt)
+                except Exception as e:
+                    logger.error("player_insert_failed",
+                                    player_id=player["PERSON_ID"],
+                                    player_name=player["DISPLAY_FIRST_LAST"], 
+                                    environment=env,
+                                    error=str(e))
+                    raise
                 if result.rowcount == 1:
                     inserted += 1
                 else:
                     skipped += 1
 
-    print(
-        f"Players Seeding Completed. Players seeded: {inserted} inserted, "
-        f"{skipped} already existed"
-    )
+
+    logger.info("player_seeding_complete",
+                message=f"Players Seeding Completed. Players seeded: {inserted} inserted, {skipped} already existed")
 
 
 if __name__ == "__main__":
