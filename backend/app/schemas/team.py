@@ -11,10 +11,13 @@ class TeamBase(BaseModel):
     conference: Optional[str]
     logo: Optional[str]
 
+class TeamWithRoster(TeamBase):
+    players: list["PlayerBase"]
+
+
 class TeamDetail(TeamBase):
     standing: "StandingBase"
     season_averages: list["TeamSeasonAverageBase"]
-    players: list["PlayerBase"]
 
 class TeamWithSeasonAverage(TeamBase):
     season_averages: list["TeamSeasonAverageBase"]
@@ -28,6 +31,7 @@ from .standing import StandingBase
 from .team_season_average import TeamSeasonAverageBase
 from .game import GameBase
 
+TeamWithRoster.model_rebuild()
 TeamDetail.model_rebuild()
 TeamSeasonAverageBase.model_rebuild()
 TeamWithGames.model_rebuild()
