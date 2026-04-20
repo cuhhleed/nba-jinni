@@ -311,13 +311,13 @@ _Prerequisite: `shared/session.py` Lambda environment support (Story 4.4) [ADR-0
 
 Tasks:
 
-- [ ] Initialize FastAPI project under `/backend`
-- [ ] Install `/shared` as a local dependency in the `/backend` package and import models and session initializer from it [ADR-001]
-- [ ] Configure SQLAlchemy async engine with connection pooling
-- [ ] Set up dependency injection pattern for DB sessions
-- [ ] Configure Mangum handler to run FastAPI inside AWS Lambda
-- [ ] Add health check endpoint (`GET /health`)
-- [ ] Add CORS middleware configured for the CloudFront frontend domain
+- [x] Initialize FastAPI project under `/backend`
+- [x] Install `/shared` as a local dependency in the `/backend` package and import models and session initializer from it [ADR-001]
+- [x] Configure SQLAlchemy async engine with connection pooling
+- [x] Set up dependency injection pattern for DB sessions
+- [x] Configure Mangum handler to run FastAPI inside AWS Lambda
+- [x] Add health check endpoint (`GET /health`)
+- [x] Add CORS middleware configured for the CloudFront frontend domain
 
 ---
 
@@ -338,10 +338,10 @@ _As a user, I want to search for players and browse teams so I can navigate to t
 
 Tasks:
 
-- [ ] Implement `GET /teams` — return all teams
-- [ ] Implement `GET /teams/{team_id}/roster` — return players on a team
-- [ ] Implement `GET /players/search?q=` — search players by name
-- [ ] Implement `GET /players/{player_id}` — return player profile
+- [x] Implement `GET /teams` — return all teams
+- [x] Implement `GET /teams/{team_id}/roster` — return players on a team
+- [x] Implement `GET /players/search?q=` — search players by name
+- [x] Implement `GET /players/{player_id}` — return player profile
 
 ---
 
