@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from nbajinni_shared.logging import configure_logging, get_logger
 from .dependencies import get_db
-from .routers import players, teams, games
+from .routers import players, teams, games, standings
 
 load_dotenv()
 
@@ -19,6 +19,7 @@ app = FastAPI()
 app.include_router(players.router)
 app.include_router(teams.router)
 app.include_router(games.router)
+app.include_router(standings.router)
 
 origins = [
     os.getenv("FRONTEND_ORIGIN")

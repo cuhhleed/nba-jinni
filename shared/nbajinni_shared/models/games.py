@@ -7,6 +7,9 @@ from nbajinni_shared.base import Base
 class Game(Base):
     __tablename__ = "games"
 
+    # Status codes for Game.status
+    COMPLETED_STATUS: int = 3
+
     id: Mapped[str] = mapped_column(primary_key=True)
     home_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
     away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)

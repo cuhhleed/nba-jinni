@@ -9,7 +9,7 @@ from sqlalchemy import func
 class Standing(Base):
     __tablename__ = "standings"
 
-    season: Mapped[int] = mapped_column(ForeignKey("seasons.season"), primary_key=True)
+    season: Mapped[str] = mapped_column(ForeignKey("seasons.season"), primary_key=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), primary_key=True,index=True)
     conference: Mapped[str] = mapped_column()
     conference_rank: Mapped[int] = mapped_column()
@@ -28,5 +28,6 @@ class Standing(Base):
     opp_points_pg: Mapped[float] = mapped_column(Numeric(5, 1))
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
-    # relationship for bi-directionality
-    team: Mapped["Team"] = relationship("Team", back_populates="standing")
+    # One-way relationship — Team.standing is viewonly with a custom primaryjoin,
+    # so back_populates cannot be used here.
+    team: Mapped["Team"] = relationship("Team")
