@@ -71,6 +71,8 @@ games           — id, date, home_team_id, away_team_id, season_id, status
 player_game_stats — id, player_id, game_id, points, rebounds, assists, steals,
                     blocks, turnovers, fg_pct, three_pct, ft_pct, minutes
 player_season_averages — player_id, season_id, (same stat cols as above)
+standings       — team_id, season, conference, conference_rank, wins, losses,
+                  win_pct, games_behind, streak, points_pg, opp_points_pg [ADR-006]
 injuries        — id, player_id, status, description, updated_at
 users           — id, email, hashed_password, created_at
 ```
@@ -341,7 +343,9 @@ Tasks:
 - [x] Implement `GET /teams` — return all teams
 - [x] Implement `GET /teams/{team_id}/roster` — return players on a team
 - [x] Implement `GET /players/search?q=` — search players by name
-- [x] Implement `GET /players/{player_id}` — return player profile
+- [x] Implement `GET /players/{player_id}` — return player profile (trimmed to `base + team` only) [ADR-006]
+- [x] Implement `GET /teams/{team_id}` — return team detail [ADR-006]
+- [x] Implement `GET /teams/{team_id}/games` — games for a team with nested `team_game_stats` (null for unplayed games); current season [ADR-006]
 
 ---
 
@@ -350,13 +354,19 @@ _As a user, I want to view a variety of stat views for any player so I can asses
 
 Tasks:
 
-- [ ] Implement `GET /players/{player_id}/season-averages` — current season averages
-- [ ] Implement `GET /players/{player_id}/last-5-games` — last 5 game logs
-- [ ] Implement `GET /players/{player_id}/vs-opponent?team_id=` — historical stats vs a specific team
-- [ ] Implement `GET /players/{player_id}/vs-matchup?position=` — historical stats vs a positional matchup
-- [ ] Implement `GET /players/{player_id}/injuries` — current injury status
-- [ ] Implement `GET /players/compare?ids=` — side-by-side stat comparison for 2+ players
-- [ ] Write unit tests for all stat endpoints (mocked DB queries)
+- [x] Implement `GET /players/{player_id}/season-averages` — current season averages [ADR-006]
+- [x] Implement `GET /players/{player_id}/last-5-games` — last 5 game logs (response includes `game_date` + `opponent_team_id`) [ADR-006]
+- [x] Implement `GET /players/{player_id}/vs-opponent?team_id=` — stats vs a specific team, current season only [ADR-006]
+- ~~[ ] Implement `GET /players/{player_id}/vs-matchup?position=` — historical stats vs a positional matchup~~ _(removed from scope [ADR-006])_
+- ~~[ ] Implement `GET /players/{player_id}/injuries` — current injury status~~ _(removed from scope — no ingestion pipeline for injuries [ADR-006])_
+- ~~[ ] Implement `GET /players/compare?ids=` — side-by-side stat comparison for 2+ players~~ _(removed from scope alongside Story 6.5 [ADR-006])_
+- [x] Implement `GET /players/top/preview` — top 3 players per stat category (points, rebounds, assists, steals, blocks) with early-season floor handling [ADR-006]
+- [x] Implement `GET /games/{game_id}` — discriminated union (`GamePreview` for upcoming / `GameResult` for completed) [ADR-006]
+- [x] Implement `GET /games/{game_id}/playerstats` — player box scores for both teams [ADR-006]
+- [x] Implement `GET /games/h2h?team_a=&team_b=` — head-to-head games; symmetric query params; current season [ADR-006]
+- [x] Implement `GET /standings` — all 30 teams, current season [ADR-006]
+- [x] Implement `GET /standings/preview` — top 10 by `win_pct` crossing both conferences [ADR-006]
+- [x] Write unit tests for all stat endpoints (happy path + 404 / empty cases against real AsyncSession) [ADR-006]
 
 ---
 
@@ -410,35 +420,59 @@ _As a user, I want a rich player detail page where I can toggle between differen
 
 Tasks:
 
-- [ ] Build `/players/{id}` page — player header (name, team, position, injury badge)
-- [ ] Build tabbed stat view component with tabs for: Season Averages, Last 5 Games, vs Opponent, vs Matchup
+- [ ] Build `/players/{id}` page — player header (name, team, position~~, injury badge~~ [ADR-006])
+- [ ] Build tabbed stat view component with tabs for: Season Averages, Last 5 Games, vs Opponent ~~, vs Matchup~~ [ADR-006]
 - [ ] Build season averages stat card
 - [ ] Build last 5 games log table
 - [ ] Build vs-opponent stat view (with team selector dropdown)
-- [ ] Build vs-matchup stat view (with position selector)
+- ~~[ ] Build vs-matchup stat view (with position selector)~~ _(removed from scope [ADR-006])_
 - [ ] Add loading skeletons and error states to all data views
 
 ---
 
-**Story 6.5 — Player comparison view**
-_As a user, I want to compare two or more players side-by-side so I can evaluate relative performance._
+~~**Story 6.5 — Player comparison view**~~ _(removed from scope [ADR-006])_
+~~_As a user, I want to compare two or more players side-by-side so I can evaluate relative performance._~~
 
 Tasks:
 
-- [ ] Build `/compare` page — player selector (add up to 4 players)
-- [ ] Build side-by-side stat comparison table
-- [ ] Highlight best value per stat row
+- ~~[ ] Build `/compare` page — player selector (add up to 4 players)~~
+- ~~[ ] Build side-by-side stat comparison table~~
+- ~~[ ] Highlight best value per stat row~~
 
 ---
 
-**Story 6.6 — Dashboard**
-_As a user, I want a home dashboard so I have a useful landing page when I log in._
+**Story 6.6 — Front Page** ~~Dashboard~~ [ADR-006]
+_As a user, I want a home landing page surfacing today's games, top players, and standings at a glance._ [ADR-006]
 
 Tasks:
 
-- [ ] Build `/dashboard` — today's game schedule with participating teams
-- [ ] Add a "players to watch" section (players with games today)
+- [ ] Build `/` front page — today's game schedule widget backed by `GET /games/upcoming` [ADR-006]
+- [ ] Build "top players" widget backed by `GET /players/top/preview` (5 stat categories, top 3 each) [ADR-006]
+- [ ] Build "standings preview" widget backed by `GET /standings/preview` (top 10 cross-conference) [ADR-006]
 - [ ] Add quick-access links to recently viewed players (stored in local state)
+
+---
+
+**Story 6.7 — Standings Page** [ADR-006]
+_As a user, I want to view the full league standings grouped by conference._
+
+Tasks:
+
+- [ ] Build `/standings` page — full standings table backed by `GET /standings` [ADR-006]
+- [ ] Group rows by `conference`; order within each group by `conference_rank` [ADR-006]
+- [ ] Display wins, losses, win_pct, games_behind, streak, points_pg, opp_points_pg columns [ADR-006]
+
+---
+
+**Story 6.8 — Game Page** [ADR-006]
+_As a user, I want a game detail page that adapts to whether the game has been played._
+
+Tasks:
+
+- [ ] Build `/games/{id}` page — consume `GET /games/{game_id}` discriminated union and branch on `kind` [ADR-006]
+- [ ] Preview branch: render both teams' standings + season averages (data embedded in `GamePreview`); fetch `GET /games/h2h?team_a=&team_b=` for head-to-head history [ADR-006]
+- [ ] Result branch: render both teams' box-score totals from `GameResult`; fetch `GET /games/{game_id}/playerstats` for per-player box scores [ADR-006]
+- [ ] Handle 409 ("Game not yet played") gracefully when a past-status game has no team_stats [ADR-006]
 
 ---
 
@@ -576,3 +610,4 @@ Tasks:
 | Data freshness        | ~~Nightly Lambda (EventBridge)~~ Local cron + S3 sync [ADR-005] | ~~Fits API call budget; serverless; clean pattern~~ Cost-optimized hybrid local-cloud; zero incremental AWS cost [ADR-005]       |
 | Shared code (ADR-001) | `/shared` package                                               | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                              |
 | Data source (ADR-002) | `nba_api` Python package                                        | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost |
+| API design (ADR-006)  | ENDPOINTS.md-driven surface                                     | Endpoints derived from planned frontend pages rather than speculation; discriminated union for `/games/{id}`; removed speculative `vs-matchup`, `injuries`, `compare` |

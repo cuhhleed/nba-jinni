@@ -26,6 +26,15 @@ class TeamWithGames(TeamBase):
     home_games: list["GameBase"]
     away_games: list["GameBase"]
 
+class TeamWithStandingAndAverage(TeamBase):
+    # Used in GamePreview: exposes team identity, current-season standing, and
+    # season averages (pre-filtered by the handler to the game's season).
+    standing: Optional["StandingBase"]
+    season_averages: list["TeamSeasonAverageBase"]
+
+class TeamWithStanding(TeamBase):
+    standing: Optional["StandingBase"]
+
 from .player import PlayerBase
 from .standing import StandingBase
 from .team_season_average import TeamSeasonAverageBase
@@ -35,4 +44,6 @@ TeamWithRoster.model_rebuild()
 TeamDetail.model_rebuild()
 TeamSeasonAverageBase.model_rebuild()
 TeamWithGames.model_rebuild()
+TeamWithStandingAndAverage.model_rebuild()
+TeamWithStanding.model_rebuild()
 

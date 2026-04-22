@@ -14,13 +14,11 @@ class PlayerWithTeam(PlayerBase):
     team: "TeamBase"
 
 class PlayerDetail(PlayerBase):
+    # Trimmed to base + team only. Dedicated endpoints exist for game_stats and
+    # season_averages so eager-loading all of them here is unnecessary.
     team: "TeamBase"
-    game_stats: list["PlayerGameStatBase"]
-    season_averages: list["PlayerSeasonAverageBase"]
 
 from .team import TeamBase
-from .player_game_stat import PlayerGameStatBase
-from .player_season_average import PlayerSeasonAverageBase
 
 PlayerWithTeam.model_rebuild()
 PlayerDetail.model_rebuild()

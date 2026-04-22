@@ -1,4 +1,6 @@
 from pydantic import BaseModel, ConfigDict
+from datetime import date
+
 
 class PlayerGameStatBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -28,3 +30,16 @@ class PlayerGameStatBase(BaseModel):
     ftp: float
     tpp: float
     plus_minus: int
+
+
+class PlayerGameStatWithContext(PlayerGameStatBase):
+    """
+    Extends PlayerGameStatBase with game-level context fields that are not stored
+    on PlayerGameStat directly but are resolved from the joined Game row:
+    - game_date: populated from Game.game_date in the handler query
+    - opponent_team_id: whichever of Game.home_team_id / Game.away_team_id
+      does not equal PlayerGameStat.team_id
+    """
+
+    game_date: date
+    opponent_team_id: int

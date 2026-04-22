@@ -1,4 +1,11 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, ConfigDict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .player import PlayerBase
+
 
 class PlayerSeasonAverageBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -26,3 +33,14 @@ class PlayerSeasonAverageBase(BaseModel):
     ftp: float
     tpp: float
     plus_minus_pg: float
+
+
+class PlayerSeasonAverageWithPlayer(PlayerSeasonAverageBase):
+    """Used by GET /players/top/preview to include player identity alongside stats."""
+
+    player: "PlayerBase"
+
+
+from .player import PlayerBase
+
+PlayerSeasonAverageWithPlayer.model_rebuild()
