@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.teams import Team
+from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from ..dependencies import get_db, get_current_season
@@ -95,40 +96,41 @@ async def get_game_player_stats(game_id: str, db: AsyncSession = Depends(get_db)
 
 @router.get("/games/{game_id}", response_model=GameDetailResponse)
 async def get_game_details(game_id: str, db: AsyncSession = Depends(get_db)):
-    # Single fetch — eager-loads the superset of relationships needed by both branches.
-    # season_averages loaded without .and_() filter so game.season is available to
-    # pick the right season in Python after the fetch (avoids a pre-query for status).
-    stmt = (
-        select(Game)
-        .where(Game.id == game_id)
-        .options(
-            selectinload(Game.team_stats),
-            selectinload(Game.home_team).selectinload(Team.season_averages),
-            selectinload(Game.home_team).selectinload(Team.standing),
-            selectinload(Game.away_team).selectinload(Team.season_averages),
-            selectinload(Game.away_team).selectinload(Team.standing),
-        )
-    )
-    result = await db.execute(stmt)
-    game = result.scalar_one_or_none()
-
+    game = await db.scalar(select(Game).where(Game.id == game_id))
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found.")
 
-    if game.status != Game.COMPLETED_STATUS:
-        # Filter season_averages to the game's season in Python after the fetch.
-        game.home_team.season_averages = [
-            a for a in game.home_team.season_averages if a.season == game.season
-        ]
-        game.away_team.season_averages = [
-            a for a in game.away_team.season_averages if a.season == game.season
-        ]
-        return GamePreview.model_validate(game)
-    else:
-        # A completed game with fewer than 2 team_stats rows means partial/missing data.
+    if game.status == Game.COMPLETED_STATUS:
+        stmt = (
+            select(Game)
+            .where(Game.id == game_id)
+            .options(
+                selectinload(Game.team_stats),
+                selectinload(Game.home_team).selectinload(Team.standing),
+                selectinload(Game.away_team).selectinload(Team.standing),
+            )
+        )
+        game = (await db.execute(stmt)).scalar_one()
         if len(game.team_stats) < 2:
             raise HTTPException(
                 status_code=409,
                 detail="Game is marked complete but team stats are not yet available.",
             )
         return GameResult.model_validate(game)
+
+    stmt = (
+        select(Game)
+        .where(Game.id == game_id)
+        .options(
+            selectinload(Game.home_team).selectinload(
+                Team.season_averages.and_(TeamSeasonAverage.season == game.season)
+            ),
+            selectinload(Game.home_team).selectinload(Team.standing),
+            selectinload(Game.away_team).selectinload(
+                Team.season_averages.and_(TeamSeasonAverage.season == game.season)
+            ),
+            selectinload(Game.away_team).selectinload(Team.standing),
+        )
+    )
+    game = (await db.execute(stmt)).scalar_one()
+    return GamePreview.model_validate(game)

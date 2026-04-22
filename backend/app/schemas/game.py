@@ -22,6 +22,9 @@ def _split_team_stats(data: object) -> object:
     Converts an ORM Game instance into a plain dict with home_team_stat / away_team_stat
     scalars split out of the Game.team_stats list. Called by model_validators on GameResult
     and GameWithTeamStats so the splitting logic lives in one place.
+
+    home_team / away_team are passed through untouched — only included when the handler
+    has eager-loaded them (GameResult needs them for standing; GameWithTeamStats does not).
     """
     if not hasattr(data, "team_stats"):
         return data
@@ -32,7 +35,7 @@ def _split_team_stats(data: object) -> object:
             home_stat = stat
         elif stat.team_id == data.away_team_id:
             away_stat = stat
-    return {
+    payload = {
         "id": data.id,
         "home_team_id": data.home_team_id,
         "away_team_id": data.away_team_id,
@@ -42,6 +45,11 @@ def _split_team_stats(data: object) -> object:
         "home_team_stat": home_stat,
         "away_team_stat": away_stat,
     }
+    if "home_team" in data.__dict__:
+        payload["home_team"] = data.home_team
+    if "away_team" in data.__dict__:
+        payload["away_team"] = data.away_team
+    return payload
 
 
 class GameWithTeams(GameBase):
@@ -76,6 +84,8 @@ class GameResult(GameBase):
     """
 
     kind: Literal["result"] = "result"
+    home_team: "TeamWithStanding"
+    away_team: "TeamWithStanding"
     home_team_stat: "TeamGameStatBase"
     away_team_stat: "TeamGameStatBase"
 
@@ -109,7 +119,7 @@ GameDetailResponse = Annotated[
 ]
 
 
-from .team import TeamWithSeasonAverage, TeamWithStandingAndAverage
+from .team import TeamWithSeasonAverage, TeamWithStandingAndAverage, TeamWithStanding
 from .team_game_stat import TeamGameStatBase
 
 GameWithTeams.model_rebuild()

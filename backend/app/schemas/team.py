@@ -32,6 +32,9 @@ class TeamWithStandingAndAverage(TeamBase):
     standing: Optional["StandingBase"]
     season_averages: list["TeamSeasonAverageBase"]
 
+class TeamWithStanding(TeamBase):
+    standing: Optional["StandingBase"]
+
 from .player import PlayerBase
 from .standing import StandingBase
 from .team_season_average import TeamSeasonAverageBase
@@ -42,4 +45,5 @@ TeamDetail.model_rebuild()
 TeamSeasonAverageBase.model_rebuild()
 TeamWithGames.model_rebuild()
 TeamWithStandingAndAverage.model_rebuild()
+TeamWithStanding.model_rebuild()
 
