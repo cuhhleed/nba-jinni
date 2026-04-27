@@ -2,7 +2,12 @@
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ["Russo One", "sans-serif"],
+        light: ["DM Sans", "sans-serif"],
+      },
+    },
   },
   plugins: [],
 }

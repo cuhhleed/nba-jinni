@@ -110,6 +110,12 @@ class GameWithTeamStats(GameBase):
         return _split_team_stats(data)
 
 
+class TeamScheduleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    recent: list["GameWithTeamStats"]
+    upcoming: list["GameBase"]
+
+
 # Discriminated union for GET /games/{id}.
 # Uses the computed `kind` field (Literal["preview"] | Literal["result"]) as the
 # discriminator rather than the raw int `status`, since Pydantic requires string literals.
