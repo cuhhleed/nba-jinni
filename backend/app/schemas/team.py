@@ -35,10 +35,16 @@ class TeamWithStandingAndAverage(TeamBase):
 class TeamWithStanding(TeamBase):
     standing: Optional["StandingBase"]
 
+class TeamStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    season_average: Optional["TeamSeasonAverageBase"]
+    recent_game_stats: list["GameWithTeamStats"]
+
 from .player import PlayerBase
 from .standing import StandingBase
 from .team_season_average import TeamSeasonAverageBase
-from .game import GameBase
+from .team_game_stat import TeamGameStatBase
+from .game import GameBase, GameWithTeamStats
 
 TeamWithRoster.model_rebuild()
 TeamDetail.model_rebuild()
@@ -46,4 +52,5 @@ TeamSeasonAverageBase.model_rebuild()
 TeamWithGames.model_rebuild()
 TeamWithStandingAndAverage.model_rebuild()
 TeamWithStanding.model_rebuild()
+TeamStatsResponse.model_rebuild()
 
