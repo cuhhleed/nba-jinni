@@ -1,6 +1,7 @@
 import { Link } from "react-router";
-import logoPlaceholder from "../assets/logo-placeholder.svg";
 import PageContainer from "../components/layout/PageContainer";
+import TeamLogo from "../components/teams/TeamLogo";
+import CornerFrame from "../components/ui/CornerFrame";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
 import { useTeams } from "../hooks/useTeams";
@@ -19,23 +20,24 @@ export default function Teams() {
     const renderGrid = (conferenceTeams: typeof teams) => (
       <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
         {conferenceTeams.map((team) => (
-          <Link
-            to={`/teams/${team.id}`}
-            key={team.id}
-            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 border rounded-xl text-center bg-white hover:bg-amber-400 hover:shadow-lg hover:scale-105 transition-all"
+          <CornerFrame
+            size="sm"
+            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 border border-amber-400 text-center bg-gray-900 hover:bg-amber-400 hover:shadow-lg hover:scale-105 transition-all m-2"
           >
-            <img
-              src={logoPlaceholder}
-              alt={`${team.name} logo`}
-              className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 mx-auto mb-1 sm:mb-2"
-            />
-            <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-gray-900">
-              {team.name}
-            </h2>
-            <h3 className="text-xs sm:text-sm font-light text-gray-900">
-              ({team.code})
-            </h3>
-          </Link>
+            <Link to={`/teams/${team.id}`} key={team.id}>
+              <TeamLogo
+                teamId={team.id}
+                alt={team.name}
+                className="mx-auto mb-1 sm:mb-2"
+              />
+              <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-sky-500">
+                {team.name}
+              </h2>
+              <h3 className="text-xs sm:text-sm font-light text-sky-500">
+                ({team.code})
+              </h3>
+            </Link>
+          </CornerFrame>
         ))}
       </div>
     );

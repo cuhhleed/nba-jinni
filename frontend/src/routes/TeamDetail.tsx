@@ -1,16 +1,26 @@
+import { useState } from "react";
 import { useParams } from "react-router";
-import logoPlaceholder from "../assets/logo-placeholder-2.svg";
 import PageContainer from "../components/layout/PageContainer";
 import TeamStandingWidget from "../components/standings/TeamStandingWidget";
+import RosterTab from "../components/teams/RosterTab";
 import StatsTab from "../components/teams/StatsTab";
+import TeamLogo from "../components/teams/TeamLogo";
 import CornerFrame from "../components/ui/CornerFrame";
+import EmptyState from "../components/ui/EmptyState";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
+import PillTabs from "../components/ui/PillTabs";
 import { useTeamInfo } from "../hooks/useTeamInfo";
+
+const TABS = [
+  { id: "roster", label: "Roster" },
+  { id: "schedule", label: "Schedule" },
+];
 
 export default function TeamDetail() {
   const { id } = useParams();
   const teamId = Number(id);
+  const [activeTab, setActiveTab] = useState("roster");
 
   const { data: teamInfo, isLoading, error } = useTeamInfo(teamId);
   if (isLoading) {
@@ -18,30 +28,47 @@ export default function TeamDetail() {
   } else if (error) {
     return <ErrorPage />;
   } else if (teamInfo) {
-    const teamInfoBlock = (
+    return (
       <PageContainer>
         <div>
-          <div className="team-block-container grid grid-cols-2 bg-sky-500">
-            <CornerFrame className="team-badge flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-1 bg-gray-900 border border-amber-800">
-              <img
-                src={logoPlaceholder}
-                alt={`${teamInfo.name} logo`}
-                className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-20 mx-auto mb-1 mt-6"
-              />
-              <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-amber-400 text-center mt-4">
-                {teamInfo.name}
-                <h3 className="text-xs sm:text-sm font-light text-amber-400 text-center">
-                  ({teamInfo.code})
-                </h3>
-              </h2>
+          <div className="team-block-container grid grid-cols-1">
+            <CornerFrame
+              size="lg"
+              className="team-badge flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-2 bg-gray-900 mx-2 lg:my-2 border-4 border-amber-500 border-double"
+            >
+              <div className="team-container p-2 sm:p-3 lg:p-4 mx-6 rounded-lg grid grid-cols-1 content-center">
+                <TeamLogo
+                  size="lg"
+                  teamId={teamId}
+                  alt={teamInfo.name}
+                  className="mx-auto mb-1 mt-6"
+                ></TeamLogo>
+                <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-sky-600 text-center mt-4">
+                  {teamInfo.name}
+                  <h3 className="text-xs sm:text-sm font-light text-sky-600 text-center">
+                    ({teamInfo.code})
+                  </h3>
+                </h2>
+              </div>
+              <TeamStandingWidget standing={teamInfo.standing} />
             </CornerFrame>
-            <TeamStandingWidget standing={teamInfo.standing} />
           </div>
-          <StatsTab />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3">
+            <StatsTab />
+
+            <div className="tab-window-container flex flex-col col-span-2 max-h-[40vh]">
+              <div className="flex justify-center mt-6">
+                <PillTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+              </div>
+              <div className="mt-6 flex-1 min-h-0 overflow-y-auto">
+                {activeTab === "roster" && <RosterTab />}
+                {activeTab === "schedule" && <EmptyState />}
+              </div>
+            </div>
+          </div>
         </div>
       </PageContainer>
     );
-
-    return teamInfoBlock;
   }
 }

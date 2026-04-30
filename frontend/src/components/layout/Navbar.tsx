@@ -7,7 +7,7 @@ const navLinks = (
     <li>
       <Link
         to="/teams"
-        className="text-sm font-medium font-brand text-sky-500 hover:text-amber-500"
+        className="text-sm font-medium font-brand text-sky-600 hover:text-amber-500"
       >
         Teams
       </Link>
@@ -15,7 +15,7 @@ const navLinks = (
     <li>
       <Link
         to="/standings"
-        className="text-sm font-medium font-brand text-sky-500 hover:text-amber-500"
+        className="text-sm font-medium font-brand text-sky-600 hover:text-amber-500"
       >
         Standings
       </Link>
@@ -40,7 +40,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           <Link
             to="/"
-            className="font-semibold font-brand text-lg text-sky-500 hover:text-amber-400"
+            className="font-semibold font-brand text-lg text-sky-600 hover:text-amber-500"
           >
             NBA Jinni
           </Link>
@@ -53,7 +53,7 @@ export default function Navbar() {
                 placeholder="Search players..."
                 className="flex-1 border border-gray-300 rounded-l-md px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
               />
-              <button className="border border-l-0 border-gray-300 rounded-r-md px-3 bg-sky-500 hover:bg-amber-500">
+              <button className="border border-l-0 border-gray-300 rounded-r-md px-3 bg-sky-600 hover:bg-amber-500">
                 <MagnifyingGlassIcon className="h-4 w-4 text-gray-900" />
               </button>
             </div>
@@ -64,7 +64,7 @@ export default function Navbar() {
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
           >
-            <Bars3Icon className="h-6 w-6 text-sky-500 hover:text-amber-400" />
+            <Bars3Icon className="h-6 w-6 text-sky-600 hover:text-amber-400" />
           </button>
         </div>
       </nav>
@@ -81,16 +81,16 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation"
             >
-              <XMarkIcon className="h-6 w-6 text-sky-500 hover:text-amber-400" />
+              <XMarkIcon className="h-6 w-6 text-sky-600 hover:text-amber-400" />
             </button>
             {navLinks}
             <div className="flex items-stretch">
               <input
                 type="search"
                 placeholder="Search players..."
-                className="flex-1 border border-gray-600 bg-gray-800 text-gray-100 placeholder-gray-400 rounded-l-md px-3 py-1.5 text-sm focus:outline-none focus:border-sky-500"
+                className="flex-1 border border-gray-600 bg-gray-800 text-gray-100 placeholder-gray-400 rounded-l-md px-3 py-1.5 text-sm focus:outline-none focus:border-sky-600"
               />
-              <button className="border border-l-0 border-gray-600 rounded-r-md px-3 bg-sky-500 hover:bg-amber-500">
+              <button className="border border-l-0 border-gray-600 rounded-r-md px-3 bg-sky-600 hover:bg-amber-500">
                 <MagnifyingGlassIcon className="h-4 w-4 text-gray-900" />
               </button>
             </div>
