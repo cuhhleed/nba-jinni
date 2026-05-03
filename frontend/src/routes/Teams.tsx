@@ -22,7 +22,7 @@ export default function Teams() {
         {conferenceTeams.map((team) => (
           <CornerFrame
             size="sm"
-            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 border border-amber-400 text-center bg-gray-900 hover:bg-amber-400 hover:shadow-lg hover:scale-105 transition-all m-2"
+            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center bg-gray-900 hover:bg-amber-500 hover:shadow-lg hover:scale-105 transition-all m-2 border-4 border-amber-500 border-double"
           >
             <Link to={`/teams/${team.id}`} key={team.id}>
               <TeamLogo

@@ -20,7 +20,7 @@ export default function PillTabs({ tabs, activeTab, onChange, className = "" }: 
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-200 ${
             tab.id === activeTab
               ? "bg-amber-500 text-gray-900 font-brand"
-              : "text-sky-500 hover:text-amber-500"
+              : "text-sky-600 hover:text-amber-500"
           }`}
         >
           {tab.label}

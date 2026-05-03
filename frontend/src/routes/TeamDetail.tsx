@@ -2,25 +2,25 @@ import { useState } from "react";
 import { useParams } from "react-router";
 import PageContainer from "../components/layout/PageContainer";
 import TeamStandingWidget from "../components/standings/TeamStandingWidget";
+import GamesTab from "../components/teams/GamesTab";
 import RosterTab from "../components/teams/RosterTab";
 import StatsTab from "../components/teams/StatsTab";
 import TeamLogo from "../components/teams/TeamLogo";
 import CornerFrame from "../components/ui/CornerFrame";
-import EmptyState from "../components/ui/EmptyState";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
 import PillTabs from "../components/ui/PillTabs";
 import { useTeamInfo } from "../hooks/useTeamInfo";
 
 const TABS = [
-  { id: "roster", label: "Roster" },
   { id: "schedule", label: "Schedule" },
+  { id: "roster", label: "Roster" },
 ];
 
 export default function TeamDetail() {
   const { id } = useParams();
   const teamId = Number(id);
-  const [activeTab, setActiveTab] = useState("roster");
+  const [activeTab, setActiveTab] = useState("schedule");
 
   const { data: teamInfo, isLoading, error } = useTeamInfo(teamId);
   if (isLoading) {
@@ -57,13 +57,13 @@ export default function TeamDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-3">
             <StatsTab />
 
-            <div className="tab-window-container flex flex-col col-span-2 max-h-[40vh]">
+            <div className="tab-window-container flex flex-col col-span-2 max-h-[44vh]">
               <div className="flex justify-center mt-6">
                 <PillTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
               </div>
               <div className="mt-6 flex-1 min-h-0 overflow-y-auto">
+                {activeTab === "schedule" && <GamesTab />}
                 {activeTab === "roster" && <RosterTab />}
-                {activeTab === "schedule" && <EmptyState />}
               </div>
             </div>
           </div>

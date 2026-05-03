@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router";
 import Navbar from "./components/layout/Navbar";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
+import SearchResults from "./routes/SearchResults";
 import TeamDetail from "./routes/TeamDetail";
 import Teams from "./routes/Teams";
 
@@ -18,6 +19,7 @@ function App() {
             <Route path="/teams" element={<Teams />} />
             <Route path="/teams/:id" element={<TeamDetail />} />
             <Route path="/players/:id" element={<p>Player Detail</p>} />
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/standings" element={<p>Standings</p>} />
             <Route path="/games/:id" element={<p>Game</p>} />
           </Routes>

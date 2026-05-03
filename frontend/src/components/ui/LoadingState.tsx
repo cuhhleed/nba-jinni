@@ -1,7 +1,7 @@
 export default function LoadingState() {
   return (
     <svg
-      className="animate-spin h-8 w-8 text-gray-400"
+      className="animate-spin h-8 w-8 text-gray-400 justify-center"
       viewBox="0 0 24 24"
       fill="none"
     >
@@ -13,11 +13,7 @@ export default function LoadingState() {
         stroke="currentColor"
         strokeWidth="4"
       />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8v8H4z"
-      />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>
   );
 }
