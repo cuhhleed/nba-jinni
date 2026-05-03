@@ -11,7 +11,10 @@ from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from ..dependencies import get_db, get_current_season
 from ..schemas.player import PlayerDetail, PlayerBase
 from ..schemas.player_game_stat import PlayerGameStatBase, PlayerGameStatWithContext
-from ..schemas.player_season_average import PlayerSeasonAverageBase, PlayerSeasonAverageWithPlayer
+from ..schemas.player_season_average import (
+    PlayerSeasonAverageBase,
+    PlayerSeasonAverageWithPlayer,
+)
 
 configure_logging()
 logger = get_logger("backend_api")
@@ -20,12 +23,19 @@ router = APIRouter()
 
 
 @router.get("/players/search", response_model=list[PlayerBase])
-async def get_player_search(q: str = Query(..., min_length=2), db: AsyncSession = Depends(get_db)):
+async def get_player_search(
+    q: str = Query(..., min_length=2), db: AsyncSession = Depends(get_db)
+):
     safe_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     stmt = (
         select(Player)
-        .where(func.concat(Player.first_name, ' ', Player.last_name).ilike(f"%{safe_q}%", escape="\\"))
+        .where(
+            Player.team_id != 0,
+            func.concat(Player.first_name, " ", Player.last_name).ilike(
+                f"%{safe_q}%", escape="\\"
+            ),
+        )
         .limit(10)
     )
 
@@ -35,7 +45,21 @@ async def get_player_search(q: str = Query(..., min_length=2), db: AsyncSession 
     return search_results
 
 
-@router.get("/players/top/preview", response_model=dict[str, list[PlayerSeasonAverageWithPlayer]])
+@router.get("/players", response_model=list[PlayerBase])
+async def get_player_search(db: AsyncSession = Depends(get_db)):
+
+    stmt = select(Player).where(Player.team_id != 0)
+
+    result = await db.execute(stmt)
+    search_results = result.scalars().all()
+
+    return search_results
+
+
+@router.get(
+    "/players/top/preview",
+    response_model=dict[str, list[PlayerSeasonAverageWithPlayer]],
+)
 async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
     """
     Returns top 3 players per stat category for the current season.
@@ -51,10 +75,11 @@ async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
 
     # Determine whether the games-played floor should apply
     max_games_played = await db.scalar(
-        select(func.max(PlayerSeasonAverage.games_played))
-        .where(PlayerSeasonAverage.season == current_season)
+        select(func.max(PlayerSeasonAverage.games_played)).where(
+            PlayerSeasonAverage.season == current_season
+        )
     )
-    apply_floor = (max_games_played is not None and max_games_played >= 10)
+    apply_floor = max_games_played is not None and max_games_played >= 10
 
     def build_top3_stmt(order_col):
         stmt = (
@@ -69,23 +94,29 @@ async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
         return stmt
 
     categories = {
-        "points":   PlayerSeasonAverage.points_pg,
+        "points": PlayerSeasonAverage.points_pg,
         "rebounds": PlayerSeasonAverage.tot_reb_pg,
-        "assists":  PlayerSeasonAverage.asts_pg,
-        "steals":   PlayerSeasonAverage.stls_pg,
-        "blocks":   PlayerSeasonAverage.blks_pg,
+        "assists": PlayerSeasonAverage.asts_pg,
+        "steals": PlayerSeasonAverage.stls_pg,
+        "blocks": PlayerSeasonAverage.blks_pg,
     }
 
     result_map: dict[str, list[PlayerSeasonAverageWithPlayer]] = {}
     for key, col in categories.items():
         rows = (await db.execute(build_top3_stmt(col))).scalars().all()
-        result_map[key] = [PlayerSeasonAverageWithPlayer.model_validate(r) for r in rows]
+        result_map[key] = [
+            PlayerSeasonAverageWithPlayer.model_validate(r) for r in rows
+        ]
 
     return result_map
 
 
-@router.get("/players/{player_id}/season-averages", response_model=list[PlayerSeasonAverageBase])
-async def get_player_season_averages(player_id: int, db: AsyncSession = Depends(get_db)):
+@router.get(
+    "/players/{player_id}/season-averages", response_model=list[PlayerSeasonAverageBase]
+)
+async def get_player_season_averages(
+    player_id: int, db: AsyncSession = Depends(get_db)
+):
     player_exists = await db.scalar(select(Player.id).where(Player.id == player_id))
     if player_exists is None:
         raise HTTPException(status_code=404, detail="Player not found.")
@@ -100,7 +131,9 @@ async def get_player_season_averages(player_id: int, db: AsyncSession = Depends(
     return result.scalars().all()
 
 
-@router.get("/players/{player_id}/last-5-games", response_model=list[PlayerGameStatWithContext])
+@router.get(
+    "/players/{player_id}/last-5-games", response_model=list[PlayerGameStatWithContext]
+)
 async def get_player_last_5_games(player_id: int, db: AsyncSession = Depends(get_db)):
     player_exists = await db.scalar(select(Player.id).where(Player.id == player_id))
     if player_exists is None:
@@ -128,7 +161,9 @@ async def get_player_last_5_games(player_id: int, db: AsyncSession = Depends(get
     return stats
 
 
-@router.get("/players/{player_id}/vs-opponent", response_model=list[PlayerGameStatWithContext])
+@router.get(
+    "/players/{player_id}/vs-opponent", response_model=list[PlayerGameStatWithContext]
+)
 async def get_player_vs_opponent(
     player_id: int,
     team_id: int = Query(...),

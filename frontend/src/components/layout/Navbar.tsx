@@ -1,6 +1,7 @@
-import { Bars3Icon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import SearchBar from "../ui/SearchBar";
 
 const navLinks = (
   <ul className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-6">
@@ -47,16 +48,7 @@ export default function Navbar() {
 
           <div className="hidden lg:flex flex-1 items-center gap-8 ml-8">
             {navLinks}
-            <div className="flex flex-1 items-stretch">
-              <input
-                type="search"
-                placeholder="Search players..."
-                className="flex-1 border border-gray-300 rounded-l-md px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-              />
-              <button className="border border-l-0 border-gray-300 rounded-r-md px-3 bg-sky-600 hover:bg-amber-500">
-                <MagnifyingGlassIcon className="h-4 w-4 text-gray-900" />
-              </button>
-            </div>
+            <SearchBar />
           </div>
 
           <button
@@ -84,15 +76,8 @@ export default function Navbar() {
               <XMarkIcon className="h-6 w-6 text-sky-600 hover:text-amber-400" />
             </button>
             {navLinks}
-            <div className="flex items-stretch">
-              <input
-                type="search"
-                placeholder="Search players..."
-                className="flex-1 border border-gray-600 bg-gray-800 text-gray-100 placeholder-gray-400 rounded-l-md px-3 py-1.5 text-sm focus:outline-none focus:border-sky-600"
-              />
-              <button className="border border-l-0 border-gray-600 rounded-r-md px-3 bg-sky-600 hover:bg-amber-500">
-                <MagnifyingGlassIcon className="h-4 w-4 text-gray-900" />
-              </button>
+            <div className="w-full">
+              <SearchBar dark />
             </div>
           </div>
         </div>
