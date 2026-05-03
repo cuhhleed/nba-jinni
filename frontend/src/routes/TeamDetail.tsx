@@ -6,7 +6,7 @@ import GamesTab from "../components/teams/GamesTab";
 import RosterTab from "../components/teams/RosterTab";
 import StatsTab from "../components/teams/StatsTab";
 import TeamLogo from "../components/teams/TeamLogo";
-import CornerFrame from "../components/ui/CornerFrame";
+import CarpetBadge from "../components/ui/CarpetBadge";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
 import PillTabs from "../components/ui/PillTabs";
@@ -32,9 +32,9 @@ export default function TeamDetail() {
       <PageContainer>
         <div>
           <div className="team-block-container grid grid-cols-1">
-            <CornerFrame
+            <CarpetBadge
               size="lg"
-              className="team-badge flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-2 bg-gray-900 mx-2 lg:my-2 border-4 border-amber-500 border-double"
+              className="team-badge flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-2 mx-2 lg:my-2"
             >
               <div className="team-container p-2 sm:p-3 lg:p-4 mx-6 rounded-lg grid grid-cols-1 content-center">
                 <TeamLogo
@@ -51,7 +51,7 @@ export default function TeamDetail() {
                 </h2>
               </div>
               <TeamStandingWidget standing={teamInfo.standing} />
-            </CornerFrame>
+            </CarpetBadge>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3">

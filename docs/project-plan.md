@@ -408,10 +408,10 @@ _As a user, I want to browse teams and drill into their rosters so I can find th
 
 Tasks:
 
-- [ ] Build `/teams` page — grid of all 30 teams with logos/names
-- [ ] Build `/teams/{id}` page — team detail with roster list
-- [ ] Build global player search bar in the nav — autocomplete calling `/players/search`
-- [ ] Wire all player cards/names to navigate to the player detail page
+- [x] Build `/teams` page — grid of all 30 teams with logos/names
+- [x] Build `/teams/{id}` page — team detail with roster list
+- [x] Build global player search bar in the nav — autocomplete calling `/players/search`
+- [x] Wire all player cards/names to navigate to the player detail page
 
 ---
 
