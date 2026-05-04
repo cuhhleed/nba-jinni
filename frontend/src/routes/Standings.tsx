@@ -20,7 +20,7 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 const COL_GRID =
-  "grid w-max lg:w-full grid-cols-[2rem_5rem_4.5rem_3.5rem_4.5rem_4.5rem_4.5rem_4rem_4rem_3rem] lg:grid-cols-[3rem_1fr_6rem_5rem_6rem_6rem_6rem_5.5rem_5.5rem_4.5rem]";
+  "grid w-max sm:w-full lg:w-full grid-cols-[2rem_1fr_4.5rem_3.5rem_4.5rem_4.5rem_4.5rem_4rem_4rem_3rem] lg:grid-cols-[3rem_1fr_6rem_5rem_6rem_6rem_6rem_5.5rem_5.5rem_4.5rem]";
 
 const HEADERS = ["RNK", "TEAM", "W/L", "W%", "HM", "AW", "L10", "PPG", "OPPG", "STRK"];
 
@@ -87,7 +87,9 @@ function StandingRow({
       </span>
       <span className={CELL}>{standing.points_pg.toFixed(1)}</span>
       <span className={CELL}>{standing.opp_points_pg.toFixed(1)}</span>
-      <span className={`text-xs lg:text-sm text-center self-center ${standing.streak > 0 ? "text-green-500" : standing.streak < 0 ? "text-red-600" : "text-gray-400"}`}>
+      <span
+        className={`text-xs lg:text-sm text-center self-center ${standing.streak > 0 ? "text-green-500" : standing.streak < 0 ? "text-red-600" : "text-gray-400"}`}
+      >
         {standing.streak}
       </span>
     </div>
