@@ -2,7 +2,7 @@ import { Link, useParams } from "react-router";
 import { useTeamRoster } from "../../hooks/useTeamRoster";
 import type { Player } from "../../types/players";
 import PlayerHeadshot from "../players/PlayerHeadshot";
-import CornerFrame from "../ui/CornerFrame";
+import CarpetBadge from "../ui/CarpetBadge";
 import EmptyState from "../ui/EmptyState";
 import ErrorPage from "../ui/ErrorPage";
 import LoadingPage from "../ui/LoadingPage";
@@ -29,9 +29,10 @@ function buildRoster(roster: Player[] | null) {
     return (
       <div className="stats-tab-container grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 scroll-auto">
         {roster.map((player) => (
-          <CornerFrame
+          <CarpetBadge
             size="sm"
-            className="player-tab-container m-4 bg-gray-900 hover:bg-amber-500 border-4 border-amber-500 border-double hover:shadow-lg hover:scale-105 transition-all"
+            className="player-tab-container m-4 hover:bg-amber-500"
+            hoverable
           >
             <Link
               className="flex flex-col items-center justify-center"
@@ -48,7 +49,7 @@ function buildRoster(roster: Player[] | null) {
                 {player.first_name + " " + player.last_name}
               </div>
             </Link>
-          </CornerFrame>
+          </CarpetBadge>
         ))}
       </div>
     );

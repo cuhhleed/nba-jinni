@@ -17,14 +17,18 @@ export default function GamesTab() {
     return <ErrorPage />;
   } else if (teamSchedule) {
     return (
-      <div className="game-tab-container bg-white">
-        <div className="games-titles-container sticky top-0 grid grid-cols-2 bg-gray-900 text-center">
-          <span className="text-sky-600 border-r border-amber-500">Recent</span>
-          <span className="text-sky-600">Upcoming</span>
+      <div className="game-tab-container bg-white grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2">
+        <div className="recent-games-container flex flex-col">
+          <span className="text-sky-600 bg-gray-900 text-center sticky top-0">
+            Recent
+          </span>
+          {buildRecentGames(teamSchedule.recent, teamId)}
         </div>
 
-        <div className="games-container grid grid-cols-2">
-          {buildRecentGames(teamSchedule.recent, teamId)}
+        <div className="upcoming-games-container flex flex-col">
+          <span className="text-sky-600 bg-gray-900 text-center sticky top-0">
+            Upcoming
+          </span>
           {buildNextGames(teamSchedule?.upcoming, teamId)}
         </div>
       </div>
@@ -37,7 +41,7 @@ function buildRecentGames(pastGames: GameWithTeamStats[] | null, teamId: number)
     return <EmptyState />;
   } else {
     return (
-      <div className="past-games-container border-r border-amber-500">
+      <div className="past-games-container border-amber-500 sm:border-r lg:border-r">
         {pastGames.map((game) => buildRecentGame(game, teamId))}
       </div>
     );

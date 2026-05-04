@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from "react-router";
 import PageContainer from "../components/layout/PageContainer";
 import PlayerHeadshot from "../components/players/PlayerHeadshot";
-import CornerFrame from "../components/ui/CornerFrame";
+import CarpetBadge from "../components/ui/CarpetBadge";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
@@ -30,10 +30,11 @@ export default function SearchResults() {
       ) : (
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
           {players.map((player) => (
-            <CornerFrame
+            <CarpetBadge
               key={player.id}
               size="sm"
-              className="p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center bg-gray-900 hover:bg-amber-500 hover:shadow-lg hover:scale-105 transition-all m-2 border-4 border-amber-500 border-double"
+              className="p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center hover:bg-amber-500 m-2"
+              hoverable
             >
               <Link to={`/players/${player.id}`}>
                 <PlayerHeadshot
@@ -45,7 +46,7 @@ export default function SearchResults() {
                   {player.first_name} {player.last_name}
                 </h2>
               </Link>
-            </CornerFrame>
+            </CarpetBadge>
           ))}
         </div>
       )}

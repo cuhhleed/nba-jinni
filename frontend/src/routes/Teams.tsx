@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import PageContainer from "../components/layout/PageContainer";
 import TeamLogo from "../components/teams/TeamLogo";
-import CornerFrame from "../components/ui/CornerFrame";
+import CarpetBadge from "../components/ui/CarpetBadge";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
 import { useTeams } from "../hooks/useTeams";
@@ -20,9 +20,10 @@ export default function Teams() {
     const renderGrid = (conferenceTeams: typeof teams) => (
       <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
         {conferenceTeams.map((team) => (
-          <CornerFrame
+          <CarpetBadge
             size="sm"
-            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center bg-gray-900 hover:bg-amber-500 hover:shadow-lg hover:scale-105 transition-all m-2 border-4 border-amber-500 border-double"
+            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center hover:bg-amber-500 m-2"
+            hoverable
           >
             <Link to={`/teams/${team.id}`} key={team.id}>
               <TeamLogo
@@ -37,7 +38,7 @@ export default function Teams() {
                 ({team.code})
               </h3>
             </Link>
-          </CornerFrame>
+          </CarpetBadge>
         ))}
       </div>
     );
