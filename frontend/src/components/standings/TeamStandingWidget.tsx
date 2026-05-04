@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import type { Standing } from "../../types/teams";
 import StatBubble from "../ui/StatBubble";
 
@@ -42,7 +43,10 @@ export default function TeamStandingWidget({ standing }: Props) {
   }
 
   return (
-    <div className="team-standing-container p-2 sm:p-3 lg:p-4 rounded-lg grid grid-cols-2 group">
+    <Link
+      to={`/standings`}
+      className="team-standing-container p-2 sm:p-3 lg:p-4 rounded-lg grid grid-cols-2 group"
+    >
       <h3 className="text-center text-[10px] sm:text-xl lg:text-2xl font-brand text-sky-600 col-span-2">
         {standing?.season} Standing
       </h3>
@@ -79,6 +83,6 @@ export default function TeamStandingWidget({ standing }: Props) {
         value={standing?.games_behind}
         label="GB"
       />
-    </div>
+    </Link>
   );
 }

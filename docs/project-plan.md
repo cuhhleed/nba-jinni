@@ -458,9 +458,9 @@ _As a user, I want to view the full league standings grouped by conference._
 
 Tasks:
 
-- [ ] Build `/standings` page — full standings table backed by `GET /standings` [ADR-006]
-- [ ] Group rows by `conference`; order within each group by `conference_rank` [ADR-006]
-- [ ] Display wins, losses, win_pct, games_behind, streak, points_pg, opp_points_pg columns [ADR-006]
+- [x] Build `/standings` page — full standings table backed by `GET /standings` [ADR-006]
+- [x] Group rows by `conference`; order within each group by `conference_rank` [ADR-006]
+- [x] Display wins, losses, win_pct, games_behind, streak, points_pg, opp_points_pg columns [ADR-006]
 
 ---
 
@@ -595,19 +595,19 @@ Tasks:
 
 ## Key Technical Decisions Log
 
-| Decision              | Choice                                                          | Rationale                                                                                                                        |
-| --------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Frontend framework    | React + TypeScript                                              | Most employer-recognizable; TypeScript signals maturity                                                                          |
-| Backend language      | Python + FastAPI                                                | Shared with ingestion; modern, fast, auto-docs                                                                                   |
-| Database              | PostgreSQL (RDS)                                                | Relational model fits domain; industry standard                                                                                  |
-| ORM                   | SQLAlchemy + Alembic                                            | Python standard; migration workflow is a portfolio skill                                                                         |
-| Auth                  | JWT (custom)                                                    | No external dependency; demonstrates understanding of auth fundamentals                                                          |
-| API compute           | Lambda + API Gateway                                            | Free tier; serverless pattern worth knowing                                                                                      |
-| Frontend hosting      | S3 + CloudFront                                                 | Effectively free; standard static hosting pattern                                                                                |
-| IaC                   | Terraform                                                       | Cloud-agnostic; widely recognized across employers                                                                               |
-| CI/CD                 | GitHub Actions                                                  | Lives in repo; OIDC AWS auth; highly visible to employers                                                                        |
-| Repo structure        | Monorepo                                                        | Solo project; reduces friction; unified CI/CD                                                                                    |
-| Data freshness        | ~~Nightly Lambda (EventBridge)~~ Local cron + S3 sync [ADR-005] | ~~Fits API call budget; serverless; clean pattern~~ Cost-optimized hybrid local-cloud; zero incremental AWS cost [ADR-005]       |
-| Shared code (ADR-001) | `/shared` package                                               | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                              |
-| Data source (ADR-002) | `nba_api` Python package                                        | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost |
+| Decision              | Choice                                                          | Rationale                                                                                                                                                             |
+| --------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend framework    | React + TypeScript                                              | Most employer-recognizable; TypeScript signals maturity                                                                                                               |
+| Backend language      | Python + FastAPI                                                | Shared with ingestion; modern, fast, auto-docs                                                                                                                        |
+| Database              | PostgreSQL (RDS)                                                | Relational model fits domain; industry standard                                                                                                                       |
+| ORM                   | SQLAlchemy + Alembic                                            | Python standard; migration workflow is a portfolio skill                                                                                                              |
+| Auth                  | JWT (custom)                                                    | No external dependency; demonstrates understanding of auth fundamentals                                                                                               |
+| API compute           | Lambda + API Gateway                                            | Free tier; serverless pattern worth knowing                                                                                                                           |
+| Frontend hosting      | S3 + CloudFront                                                 | Effectively free; standard static hosting pattern                                                                                                                     |
+| IaC                   | Terraform                                                       | Cloud-agnostic; widely recognized across employers                                                                                                                    |
+| CI/CD                 | GitHub Actions                                                  | Lives in repo; OIDC AWS auth; highly visible to employers                                                                                                             |
+| Repo structure        | Monorepo                                                        | Solo project; reduces friction; unified CI/CD                                                                                                                         |
+| Data freshness        | ~~Nightly Lambda (EventBridge)~~ Local cron + S3 sync [ADR-005] | ~~Fits API call budget; serverless; clean pattern~~ Cost-optimized hybrid local-cloud; zero incremental AWS cost [ADR-005]                                            |
+| Shared code (ADR-001) | `/shared` package                                               | Eliminates model duplication between `/backend` and `/ingestion`; single source of truth for schema                                                                   |
+| Data source (ADR-002) | `nba_api` Python package                                        | Free tier of api-sports.io excluded current season data; `nba_api` provides current season data directly from NBA.com at no cost                                      |
 | API design (ADR-006)  | ENDPOINTS.md-driven surface                                     | Endpoints derived from planned frontend pages rather than speculation; discriminated union for `/games/{id}`; removed speculative `vs-matchup`, `injuries`, `compare` |

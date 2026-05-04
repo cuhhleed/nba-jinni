@@ -58,15 +58,19 @@ function buildRecentGame(game: GameWithTeamStats, teamId: number) {
     const won = myTeamStat.points > oppTeamStat.points;
     return (
       <div className="past-game-container  hover:bg-amber-500">
-        <Link to={`/games/${game.id}`} key={game.id}>
-          <div className="mx-4 grid grid-cols-3 items-center justify-left">
+        <div className="mx-4 grid grid-cols-3 items-center justify-left">
+          <Link
+            to={`/games/${game.id}`}
+            key={game.id}
+            className="grid grid-cols-2 col-span-2"
+          >
             <span>{game.game_date}</span>
             <TeamLogo size="sm" teamId={oppTeamStat.team_id}></TeamLogo>
-            <span className={won ? "text-green-500" : "text-red-600"}>
-              {myTeamStat.points}-{oppTeamStat.points}
-            </span>
-          </div>
-        </Link>
+          </Link>
+          <span className={won ? "text-green-500" : "text-red-600"}>
+            {myTeamStat.points}-{oppTeamStat.points}
+          </span>
+        </div>
       </div>
     );
   }

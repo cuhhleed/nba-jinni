@@ -6,5 +6,6 @@ export function useTeams() {
   return useQuery({
     queryKey: ["teams"],
     queryFn: () => api.get<Team[]>("/teams").then((res) => res.data),
+    staleTime: 5 * 60 * 1000,
   });
 }
