@@ -14,6 +14,10 @@ import LoadingState from "./LoadingState";
 
 const MAX_SUGGESTIONS = 8;
 
+type SearchOption =
+  | { kind: "search" }
+  | { kind: "player"; player: Player };
+
 export default function SearchBar({ dark = false }: { dark?: boolean }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
@@ -22,18 +26,18 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
   if (isLoading) return <LoadingState />;
   if (error) return <ErrorState message="Could not load players." />;
 
-  const suggestions =
+  const playerSuggestions: SearchOption[] =
     !allPlayers || query.trim().length === 0
       ? []
       : allPlayers
           .filter((p) =>
             `${p.first_name} ${p.last_name}`.toLowerCase().includes(query.toLowerCase())
           )
-          .slice(0, MAX_SUGGESTIONS);
+          .slice(0, MAX_SUGGESTIONS)
+          .map((player) => ({ kind: "player", player }));
 
-  function handleSelect(player: Player | null) {
-    if (player) navigate(`/players/${player.id}`);
-  }
+  const options: SearchOption[] =
+    query.trim().length === 0 ? [] : [{ kind: "search" }, ...playerSuggestions];
 
   function handleSearch() {
     const q = query.trim();
@@ -41,7 +45,18 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
     navigate(`/search?q=${encodeURIComponent(q)}`);
   }
 
+  function handleSelect(option: SearchOption | null) {
+    if (!option) return;
+    if (option.kind === "search") {
+      handleSearch();
+    } else {
+      navigate(`/players/${option.player.id}`);
+    }
+  }
+
   const borderColor = dark ? "border-gray-600" : "border-gray-300";
+  const optionClass =
+    "cursor-pointer px-4 py-2 text-gray-900 data-[focus]:bg-amber-500 data-[focus]:text-gray-900 hover:bg-amber-500";
 
   return (
     <div className="flex flex-1 items-stretch">
@@ -51,9 +66,6 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
             placeholder="Search players..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && suggestions.length === 0) handleSearch();
-            }}
             className={[
               "w-full border rounded-l-md px-3 py-1.5 text-sm focus:outline-none focus:border-sky-600",
               borderColor,
@@ -66,15 +78,24 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
             anchor="bottom start"
             className="z-50 w-[var(--input-width)] max-h-60 overflow-auto rounded-md bg-white border border-gray-200 shadow-lg empty:hidden text-sm"
           >
-            {suggestions.map((player) => (
-              <ComboboxOption
-                key={player.id}
-                value={player}
-                className="cursor-pointer px-4 py-2 text-gray-900 data-focus:bg-sky-50 data-focus:text-sky-700 hover:bg-amber-500"
-              >
-                {player.first_name} {player.last_name}
-              </ComboboxOption>
-            ))}
+            {options.map((option) =>
+              option.kind === "search" ? (
+                <ComboboxOption key="search" value={option} className={optionClass}>
+                  <span className="flex items-center gap-2 font-medium">
+                    <MagnifyingGlassIcon className="h-4 w-4 shrink-0" />
+                    {query}
+                  </span>
+                </ComboboxOption>
+              ) : (
+                <ComboboxOption
+                  key={option.player.id}
+                  value={option}
+                  className={optionClass}
+                >
+                  {option.player.first_name} {option.player.last_name}
+                </ComboboxOption>
+              )
+            )}
           </ComboboxOptions>
         </Combobox>
       </div>

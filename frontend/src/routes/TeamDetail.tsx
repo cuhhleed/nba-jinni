@@ -59,7 +59,12 @@ export default function TeamDetail() {
 
             <div className="tab-window-container flex flex-col col-span-2 max-h-[44vh]">
               <div className="flex justify-center mt-6">
-                <PillTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+                <PillTabs
+                  className="bg-gray-900"
+                  tabs={TABS}
+                  activeTab={activeTab}
+                  onChange={setActiveTab}
+                />
               </div>
               <div className="mt-6 flex-1 min-h-0 overflow-y-auto">
                 {activeTab === "schedule" && <GamesTab />}
