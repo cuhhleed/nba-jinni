@@ -469,10 +469,10 @@ _As a user, I want a game detail page that adapts to whether the game has been p
 
 Tasks:
 
-- [ ] Build `/games/{id}` page — consume `GET /games/{game_id}` discriminated union and branch on `kind` [ADR-006]
-- [ ] Preview branch: render both teams' standings + season averages (data embedded in `GamePreview`); fetch `GET /games/h2h?team_a=&team_b=` for head-to-head history [ADR-006]
-- [ ] Result branch: render both teams' box-score totals from `GameResult`; fetch `GET /games/{game_id}/playerstats` for per-player box scores [ADR-006]
-- [ ] Handle 409 ("Game not yet played") gracefully when a past-status game has no team_stats [ADR-006]
+- [x] Build `/games/{id}` page — consume `GET /games/{game_id}` discriminated union and branch on `kind` [ADR-006]
+- [x] Preview branch: render both teams' standings + season averages (data embedded in `GamePreview`); fetch `GET /games/h2h?team_a=&team_b=` for head-to-head history [ADR-006]
+- [x] Result branch: render both teams' box-score totals from `GameResult`; fetch `GET /games/{game_id}/playerstats` for per-player box scores, fetch `GET /games/h2h?team_a=&team_b=` for head-to-head history [ADR-006]
+- [x] Handle 409 ("Game not yet played") gracefully when a past-status game has no team_stats [ADR-006]
 
 ---
 
