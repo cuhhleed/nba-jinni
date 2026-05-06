@@ -32,6 +32,13 @@ class PlayerGameStatBase(BaseModel):
     plus_minus: int
 
 
+class PlayerGameStatWithName(PlayerGameStatBase):
+    """Used by GET /games/{id}/playerstats — includes player name for the box score UI."""
+
+    first_name: str
+    last_name: str
+
+
 class PlayerGameStatWithContext(PlayerGameStatBase):
     """
     Extends PlayerGameStatBase with game-level context fields that are not stored

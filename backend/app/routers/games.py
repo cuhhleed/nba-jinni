@@ -18,7 +18,7 @@ from ..schemas.game import (
     GameDetailResponse,
     GameWithTeamStats,
 )
-from ..schemas.player_game_stat import PlayerGameStatBase
+from ..schemas.player_game_stat import PlayerGameStatBase, PlayerGameStatWithName
 
 configure_logging()
 logger = get_logger("backend_api")
@@ -78,7 +78,7 @@ async def get_h2h_games(
     return [GameWithTeamStats.model_validate(g) for g in games]
 
 
-@router.get("/games/{game_id}/playerstats", response_model=list[PlayerGameStatBase])
+@router.get("/games/{game_id}/playerstats", response_model=list[PlayerGameStatWithName])
 async def get_game_player_stats(game_id: str, db: AsyncSession = Depends(get_db)):
     game_exists = await db.scalar(select(Game.id).where(Game.id == game_id))
     if game_exists is None:
@@ -87,11 +87,18 @@ async def get_game_player_stats(game_id: str, db: AsyncSession = Depends(get_db)
     stmt = (
         select(PlayerGameStat)
         .where(PlayerGameStat.game_id == game_id)
+        .options(selectinload(PlayerGameStat.player))
         .order_by(PlayerGameStat.team_id, PlayerGameStat.points.desc())
     )
 
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    rows = (await db.execute(stmt)).scalars().all()
+    stats = []
+    for pgs in rows:
+        base = PlayerGameStatBase.model_validate(pgs).model_dump()
+        base["first_name"] = pgs.player.first_name
+        base["last_name"] = pgs.player.last_name
+        stats.append(PlayerGameStatWithName.model_validate(base))
+    return stats
 
 
 @router.get("/games/{game_id}", response_model=GameDetailResponse)
