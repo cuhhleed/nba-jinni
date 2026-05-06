@@ -112,11 +112,9 @@ async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
 
 
 @router.get(
-    "/players/{player_id}/season-averages", response_model=list[PlayerSeasonAverageBase]
+    "/players/{player_id}/season-average", response_model=PlayerSeasonAverageBase
 )
-async def get_player_season_averages(
-    player_id: int, db: AsyncSession = Depends(get_db)
-):
+async def get_player_season_average(player_id: int, db: AsyncSession = Depends(get_db)):
     player_exists = await db.scalar(select(Player.id).where(Player.id == player_id))
     if player_exists is None:
         raise HTTPException(status_code=404, detail="Player not found.")
@@ -125,10 +123,11 @@ async def get_player_season_averages(
         select(PlayerSeasonAverage)
         .where(PlayerSeasonAverage.player_id == player_id)
         .order_by(PlayerSeasonAverage.season.desc())
+        .limit(1)
     )
 
     result = await db.execute(stmt)
-    return result.scalars().all()
+    return result.scalar_one_or_none()
 
 
 @router.get(
