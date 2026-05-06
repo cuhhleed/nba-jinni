@@ -57,7 +57,7 @@ function buildRecentGame(game: GameWithTeamStats, teamId: number) {
   if (myTeamStat && oppTeamStat) {
     const won = myTeamStat.points > oppTeamStat.points;
     return (
-      <div className="past-game-container  hover:bg-amber-500">
+      <div className="past-game-container  hover:bg-amber-500/10 py-2">
         <div className="mx-4 grid grid-cols-3 items-center justify-left">
           <Link
             to={`/games/${game.id}`}

@@ -381,12 +381,12 @@ _As a developer, I want the frontend scaffolded with routing and a global state 
 
 Tasks:
 
-- [ ] Initialize Vite + React + TypeScript project under `/frontend`
-- [ ] Install and configure React Router (v6) for multi-view navigation
-- [ ] Install and configure React Query for server state management
-- [ ] Install a UI component library (Tailwind CSS recommended for portfolio visibility)
-- [ ] Set up an Axios API client with JWT injection from local storage
-- [ ] Configure environment variables for API base URL (dev vs prod)
+- [x] Initialize Vite + React + TypeScript project under `/frontend`
+- [x] Install and configure React Router (v6) for multi-view navigation
+- [x] Install and configure React Query for server state management
+- [x] Install a UI component library (Tailwind CSS recommended for portfolio visibility)
+- [x] Set up an Axios API client with JWT injection from local storage
+- [x] Configure environment variables for API base URL (dev vs prod)
 
 ---
 
@@ -420,13 +420,13 @@ _As a user, I want a rich player detail page where I can toggle between differen
 
 Tasks:
 
-- [ ] Build `/players/{id}` page — player header (name, team, position~~, injury badge~~ [ADR-006])
-- [ ] Build tabbed stat view component with tabs for: Season Averages, Last 5 Games, vs Opponent ~~, vs Matchup~~ [ADR-006]
-- [ ] Build season averages stat card
-- [ ] Build last 5 games log table
-- [ ] Build vs-opponent stat view (with team selector dropdown)
+- [x] Build `/players/{id}` page — player header (name, team, position~~, injury badge~~ [ADR-006])
+- [x] Build tabbed stat view component with tabs for: Season Averages, Last 5 Games, vs Opponent ~~, vs Matchup~~ [ADR-006]
+- [x] Build season averages stat card
+- [x] Build last 5 games log table
+- [x] Build vs-opponent stat view (with team selector dropdown)
 - ~~[ ] Build vs-matchup stat view (with position selector)~~ _(removed from scope [ADR-006])_
-- [ ] Add loading skeletons and error states to all data views
+- [x] Add loading skeletons and error states to all data views
 
 ---
 

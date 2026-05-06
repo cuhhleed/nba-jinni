@@ -20,7 +20,7 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 const COL_GRID =
-  "grid w-max sm:w-full lg:w-full grid-cols-[2rem_1fr_4.5rem_3.5rem_4.5rem_4.5rem_4.5rem_4rem_4rem_3rem] lg:grid-cols-[3rem_1fr_6rem_5rem_6rem_6rem_6rem_5.5rem_5.5rem_4.5rem]";
+  "grid w-max sm:w-full lg:w-full grid-cols-[2rem_4rem_4.5rem_3.5rem_4.5rem_4.5rem_4.5rem_4rem_4rem_3rem] sm:grid-cols-[2rem_1fr_4.5rem_3.5rem_4.5rem_4.5rem_4.5rem_4rem_4rem_3rem] lg:grid-cols-[3rem_1fr_6rem_5rem_6rem_6rem_6rem_5.5rem_5.5rem_4.5rem]";
 
 const HEADERS = ["RNK", "TEAM", "W/L", "W%", "HM", "AW", "L10", "PPG", "OPPG", "STRK"];
 
