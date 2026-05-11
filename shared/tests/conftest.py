@@ -10,7 +10,7 @@ from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 import os
-from datetime import date
+from datetime import date, datetime
 from dotenv import load_dotenv
 
 load_dotenv()  # Searches upward from CWD for .env
@@ -71,21 +71,21 @@ async def test_second_player(session, test_away_team):
 
 @pytest_asyncio.fixture
 async def test_game(session, test_home_team, test_away_team):
-    game = Game(id="0022300001", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 1), season="2024-25", status=1)
+    game = Game(id="0022300001", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 1), tipoff_at=datetime(2024, 10, 1, 19, 0), season="2024-25", status=1)
     session.add(game)
     await session.flush()
     return game
 
 @pytest_asyncio.fixture
 async def test_second_game(session, test_home_team, test_away_team):
-    game = Game(id="0022300002", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 2), season="2024-25", status=1)
+    game = Game(id="0022300002", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 2), tipoff_at=datetime(2024, 10, 2, 19, 0), season="2024-25", status=1)
     session.add(game)
     await session.flush()
     return game
 
 @pytest_asyncio.fixture
 async def test_future_game(session, test_home_team, test_away_team):
-    game = Game(id="0022300003", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2099, 12, 31), season="2024-25", status=1)
+    game = Game(id="0022300003", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2099, 12, 31), tipoff_at=datetime(2099, 12, 31, 19, 0), season="2024-25", status=1)
     session.add(game)
     await session.flush()
     return game

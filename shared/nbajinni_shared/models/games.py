@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column, relationship
-from sqlalchemy import ForeignKey
-from datetime import date
+from sqlalchemy import DateTime, ForeignKey
+from datetime import date, datetime
 from nbajinni_shared.base import Base
 
 class Game(Base):
@@ -15,6 +15,7 @@ class Game(Base):
     away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
     season: Mapped[str] = mapped_column(ForeignKey("seasons.season"), index=True)
     game_date: Mapped[date] = mapped_column(index=True)
+    tipoff_at: Mapped[datetime] = mapped_column()
     status: Mapped[int] = mapped_column()
 
     # relationships for bi-directionality

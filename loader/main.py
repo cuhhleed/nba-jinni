@@ -40,7 +40,7 @@ TABLE_ORDER = [
 
 # Columns that must be cast back to Python date/datetime objects
 DATE_COLUMNS: dict[str, set[str]] = {
-    "games": {"game_date"},
+    "games": {"game_date", "tipoff_at"},
     "players": {"birth_date"},
     "standings": {"updated_at"},
     "users": {"created_at"},

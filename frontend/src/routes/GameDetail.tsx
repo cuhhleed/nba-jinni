@@ -10,6 +10,7 @@ import EmptyState from "../components/ui/EmptyState";
 import ErrorPage from "../components/ui/ErrorPage";
 import LoadingPage from "../components/ui/LoadingPage";
 import PillTabs from "../components/ui/PillTabs";
+import GameLiveDisplay from "../components/games/GameLiveDisplay";
 import { useGameDetail } from "../hooks/useGameDetail";
 import type { GamePreview, GameResult } from "../types/games";
 
@@ -78,6 +79,14 @@ export default function GameDetail() {
   if (isLoading) return <LoadingPage />;
   if (error) return <ErrorPage />;
   if (!game) return <EmptyState />;
+
+  if (game.kind === "live") {
+    return (
+      <PageContainer>
+        <GameLiveDisplay game={game} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>

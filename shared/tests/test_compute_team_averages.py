@@ -4,7 +4,7 @@ from nbajinni_shared.utils import compute_team_averages
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.games import Game
-from datetime import date
+from datetime import date, datetime
 
 async def _expected_team_averages(session, season, team_id):
     """Query the expected averages directly using func.avg rounded to match
@@ -86,6 +86,7 @@ async def test_excludes_other_season(
         home_team_id=test_home_team.id,
         away_team_id=test_away_team.id,
         game_date=date(2023, 10, 1),
+        tipoff_at=datetime(2023, 10, 1, 19, 0),
         season="2023-24",
         status=3,
     )

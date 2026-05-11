@@ -12,7 +12,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy import text
-from datetime import date
+from datetime import date, datetime
 import os
 from dotenv import load_dotenv
 
@@ -28,8 +28,18 @@ from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 
 from app.main import app
 from app.dependencies import get_db
+from app.routers.games import _live_cache
 
 load_dotenv()
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def reset_live_cache():
+    """Clear the module-level StaleCache before each test to prevent cross-test pollution."""
+    _live_cache.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +122,7 @@ async def test_game(session, test_season, test_home_team, test_away_team):
         home_team_id=test_home_team.id,
         away_team_id=test_away_team.id,
         game_date=date(2024, 10, 1),
+        tipoff_at=datetime(2024, 10, 1, 19, 0),
         season=test_season.season,
         status=3,
     )
@@ -127,6 +138,7 @@ async def test_upcoming_game(session, test_season, test_home_team, test_away_tea
         home_team_id=test_home_team.id,
         away_team_id=test_away_team.id,
         game_date=date(2099, 12, 31),
+        tipoff_at=datetime(2099, 12, 31, 19, 0),
         season=test_season.season,
         status=1,
     )

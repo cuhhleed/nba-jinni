@@ -433,3 +433,65 @@ Story 5.3 originally scoped four basic endpoints: `/teams`, `/teams/{id}/roster`
 - **Story 6.8 (new) — Game Page:** Game detail view that branches on the discriminated union response; includes head-to-head history for upcoming games and player box scores for completed games.
 - **Schema Design block:** Add `standings` entity (team_id, season, conference, conference_rank, wins/losses, win_pct, games_behind, streak, points_pg, opp_points_pg).
 - **Key Technical Decisions Log:** Add a row for the ENDPOINTS.md-driven API redesign pattern.
+
+---
+
+## ADR-007 — Runtime live-game path via `nba_api.live` with in-process `StaleCache`
+
+**Date:** FEATURE-006  
+**Status:** Accepted
+
+### Context
+
+ADR-005 established that all backend reads come from RDS via batch ingestion. Story 6.6 (Front Page) and Story 6.8 (Game Detail) surfaced two gaps that batch-only reads cannot fill:
+
+1. Games that are currently in progress have a live score and box score that will not appear in RDS until the nightly ingestion job runs.
+2. Games that completed recently but whose ingestion has not yet run will still show as status=1 ("preview") to clients.
+
+Rendering either situation from RDS alone would mislead users — a completed game showing a "preview" card, or a live game showing stale scores.
+
+### Decision
+
+Introduce a runtime path to NBA's live CDN via `nba_api.live.nba.endpoints` (`ScoreBoard` and `BoxScore`) on the backend request path. The live data is served exclusively through two new read endpoints:
+
+- `GET /games/live/today` — today's full slate of games with current scores and status
+- `GET /games/live/{game_id}` — full live box score for a single in-progress game
+
+Live data is **cache-only and never written to RDS.** An in-process `StaleCache` (`backend/app/cache/stale_cache.py`) holds entries as `(value, expires_at, last_updated_at)` tuples. TTL is variable by game state:
+
+| State | Bulk endpoint TTL | Per-game endpoint TTL |
+|---|---|---|
+| Any live game | 30s | 30s |
+| All final, not yet ingested | 5 min | 5 min |
+| Pre-game / no games today | 30 min | — |
+
+The shorter TTL during live states favors freshness; longer TTLs during quiescent states amortize upstream load.
+
+On upstream failure, the response path degrades gracefully:
+
+1. If a fresh cached value exists, it is returned with `is_stale=False` (cache hit, no upstream call needed).
+2. If the cache is stale (TTL expired) and the upstream fails, the expired value is returned with `is_stale=True` and `last_updated_at` reflecting when it was cached.
+3. If no cached value exists at all, the endpoint returns HTTP 503 — the frontend hides the live widget without breaking the page.
+
+The per-game endpoint adds a DB validation pass before the upstream call: if `game.status == 3` (final) or `now < game.tipoff_at`, it returns HTTP 409, directing the client to use the standard `/games/{game_id}` endpoint instead. This short-circuit prevents live upstream calls for games that have no live data. The 409 matches the existing pattern at `GET /games/{game_id}` for missing team stats.
+
+### Consequences
+
+**Positive:**
+
+- Live game data is now representable on the frontend without waiting for the nightly ingest.
+- Failure modes are explicit and non-catastrophic: stale cache degrades gracefully; total upstream loss yields 503 rather than a crash.
+- No new dependencies — `nba_api.live` is already installed transitively alongside `nba_api.stats` used in ingestion.
+- No new persistent infrastructure — the cache is in-process, requires no Redis or external coordination.
+
+**Negative / Watch points:**
+
+- This is the first runtime upstream dependency on the request path. All prior upstream calls (NBA.com API) were confined to the ingestion pipeline running off the request path. Upstream latency now directly affects API response times (mitigated by the cache: cold-start is the only slow path).
+- The cache is process-local. If the backend scales to multiple replicas, each process maintains its own cache and independently polls the upstream. Cache hit rate degrades linearly with replica count. Acceptable for the current single-replica deploy; revisit with Redis or sticky routing if horizontal scale is needed.
+- `asyncio.to_thread` is used to call synchronous `nba_api.live` constructors without blocking the event loop. This is correct but relies on the threadpool having available threads during concurrent live-game traffic. Under extreme concurrency, threadpool exhaustion would produce latency rather than errors.
+- The `tipoff_at` column on `games` (introduced in the same PR) is the authoritative pre-game cutoff. If the column is stale (synthesized defaults from the migration window), the 409 short-circuit may not fire correctly until the schedule ingest reruns. The deploy choreography in `docs/SCHEMA_AMENDMENTS.md` must be followed to completion before the live endpoint is in production use.
+
+**Deferred work:**
+
+- `GameDetail.tsx` integration: deferred to Story 6.8.x. The `/games/live/{game_id}` endpoint is complete; the frontend component to consume it is not yet built.
+- Front page widget integration: deferred to Story 6.6. The `/games/live/today` endpoint is complete; the frontend component is not yet built.

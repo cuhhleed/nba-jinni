@@ -16,10 +16,9 @@ async def test_get_team_games(
     response = await client.get(f"/teams/{test_home_team.id}/games")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["id"] == test_game.id
-    # Home team stat should be populated
-    assert data[0]["home_team_stat"]["team_id"] == test_home_team.id
+    assert len(data["recent"]) == 1
+    assert data["recent"][0]["id"] == test_game.id
+    assert data["recent"][0]["home_team_stat"]["team_id"] == test_home_team.id
 
 
 @pytest.mark.asyncio
@@ -33,9 +32,8 @@ async def test_get_team_games_unplayed(
     response = await client.get(f"/teams/{test_home_team.id}/games")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["home_team_stat"] is None
-    assert data[0]["away_team_stat"] is None
+    assert len(data["upcoming"]) == 1
+    assert data["upcoming"][0]["id"] == test_upcoming_game.id
 
 
 @pytest.mark.asyncio

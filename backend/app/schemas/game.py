@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, computed_field, model_validator
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal, Optional, Union
 from pydantic import Field
 
@@ -15,6 +15,7 @@ class GameBase(BaseModel):
     season: str
     game_date: date
     status: int
+    tipoff_at: datetime
 
 
 def _split_team_stats(data: object) -> object:
@@ -41,6 +42,7 @@ def _split_team_stats(data: object) -> object:
         "away_team_id": data.away_team_id,
         "season": data.season,
         "game_date": data.game_date,
+        "tipoff_at": data.tipoff_at,
         "status": data.status,
         "home_team_stat": home_stat,
         "away_team_stat": away_stat,
@@ -125,6 +127,62 @@ GameDetailResponse = Annotated[
 ]
 
 
+class PlayerLiveStat(BaseModel):
+    player_id: int
+    first_name: str
+    last_name: str
+    points: int
+    rebounds: int
+    assists: int
+    steals: int
+    blocks: int
+    turnovers: int
+    fg_made: int
+    fg_attempted: int
+    three_made: int
+    three_attempted: int
+    ft_made: int
+    ft_attempted: int
+    minutes: str
+
+
+class GameLive(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: Literal["live"] = "live"
+    id: str
+    home_team: "TeamWithStandingAndAverage"
+    away_team: "TeamWithStandingAndAverage"
+    home_score: int
+    away_score: int
+    period: int
+    game_clock: str
+    game_status_text: str
+    home_player_stats: list[PlayerLiveStat]
+    away_player_stats: list[PlayerLiveStat]
+    last_updated_at: datetime
+    is_stale: bool
+
+
+class LiveScoreboardEntry(BaseModel):
+    id: str
+    home_team_id: int
+    away_team_id: int
+    home_score: int | None
+    away_score: int | None
+    period: int | None
+    game_clock: str | None
+    game_status_text: str
+    tipoff_at: datetime
+    state: Literal["scheduled", "live", "final"]
+
+
+class LiveScoreboardResponse(BaseModel):
+    games: list[LiveScoreboardEntry]
+    last_updated_at: datetime
+    is_stale: bool
+
+
 from .team import TeamWithSeasonAverage, TeamWithStandingAndAverage, TeamWithStanding
 from .team_game_stat import TeamGameStatBase
 
@@ -132,3 +190,4 @@ GameWithTeams.model_rebuild()
 GamePreview.model_rebuild()
 GameResult.model_rebuild()
 GameWithTeamStats.model_rebuild()
+GameLive.model_rebuild()
