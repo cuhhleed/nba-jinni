@@ -39,7 +39,42 @@ export type GameResult = GameBase & {
   away_team_stat: TeamGameStat;
 };
 
-export type GameDetailResponse = GamePreview | GameResult;
+export type PlayerLiveStat = {
+  player_id: number;
+  first_name: string;
+  last_name: string;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  fg_made: number;
+  fg_attempted: number;
+  three_made: number;
+  three_attempted: number;
+  ft_made: number;
+  ft_attempted: number;
+  minutes: string;
+};
+
+export type GameLive = {
+  kind: "live";
+  id: string;
+  home_team: TeamWithStandingAndAverage;
+  away_team: TeamWithStandingAndAverage;
+  home_score: number;
+  away_score: number;
+  period: number;
+  game_clock: string;
+  game_status_text: string;
+  home_player_stats: PlayerLiveStat[];
+  away_player_stats: PlayerLiveStat[];
+  last_updated_at: string;
+  is_stale: boolean;
+};
+
+export type GameDetailResponse = GamePreview | GameResult | GameLive;
 
 // Box score row — includes player names added by the backend schema extension.
 export type PlayerGameBoxScore = {
@@ -78,6 +113,7 @@ export type GameBase = {
   season: string;
   game_date: string;
   status: number;
+  tipoff_at: string;
 };
 
 export type GameWithTeamStats = GameBase & {

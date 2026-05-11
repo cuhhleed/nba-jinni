@@ -273,7 +273,8 @@ async def ingest_schedule(session, season):
         if game["gameLabel"]:
             continue
 
-        game_date = datetime.strptime(game["gameDate"], "%m/%d/%Y %H:%M:%S").date()
+        tipoff_at = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00")).replace(tzinfo=None)
+        game_date = tipoff_at.date()
         stmt = (
             insert(Game)
             .values(
@@ -281,6 +282,7 @@ async def ingest_schedule(session, season):
                 home_team_id=game["homeTeam_teamId"],
                 away_team_id=game["awayTeam_teamId"],
                 game_date=game_date,
+                tipoff_at=tipoff_at,
                 season=season,
                 status=game["gameStatus"]
             )
@@ -289,7 +291,8 @@ async def ingest_schedule(session, season):
                 set_={
                     "home_team_id": game["homeTeam_teamId"],
                     "away_team_id": game["awayTeam_teamId"],
-                    "game_date": game_date
+                    "game_date": game_date,
+                    "tipoff_at": tipoff_at,
                 },
             )
         )

@@ -242,3 +242,176 @@ A dedicated Lambda function that accepts `{ "season": "2023-24" }` as its event 
 - [ ] Document invocation instructions in the README
 
 ---
+
+## FEATURE-006 — Live Game Data via Cached Backend Proxy
+
+### Status
+
+COMPLETE
+
+### Depends On
+
+- **FEATURE-007** — the `tipoff_at` column added in this feature is the first user of the schema-amendment workflow defined there. The migration pattern, deploy choreography, and touch-point checklist (model, migration, parser, upsert `set_` dict, loader `DATE_COLUMNS`) are documented in FEATURE-007 and must be followed when implementing the schema portion of this feature.
+
+### Background
+
+Identified during Story 6.6 (Front Page) planning when scoping widgets that surface today's games and recent results. The site has no live-game plumbing — all data flows through nightly batch ingestion (9 AM UTC, ADR-005). The `Game` model has only two effective states: `status = 1` (not yet ingested) and `status = 3` (completed and ingested). It also lacks tip-off time — `game_date` is a date with the time component zero'd out — so there is no way to distinguish "game starts in 4 hours" from "game ended 30 minutes ago" using the current schema. The result is that any in-progress or recently-completed-but-uningested game renders as a stale "preview" everywhere (front page widgets and the existing GameDetail page from Story 6.8).
+
+### Problem
+
+- Front page cannot credibly surface "today's games" or "recent results" — both require data more current than the last nightly ingest
+- The GameDetail page renders preview UI for completed games whose nightly ingest has not yet run, misleading the user with stale schedule data and no scores
+- Live games (in progress) have no rendering path at all — they fall through into the same preview branch as upcoming games
+- Without a tip-off datetime, the frontend cannot route between "show preview" and "show live" deterministically — date-only comparison cannot resolve the difference between a 7pm tip and a 10pm tip on the same calendar day
+- Persisting live data into RDS is the wrong fit — it goes stale within seconds, conflicts with the truncate-and-insert loader pattern (ADR-005), and inflates write volume on data that is inherently ephemeral
+
+### Constraints
+
+- All current backend reads come from RDS (per ADR-005); adding `nba_api` as a runtime dependency on the request path is an architectural shift and must be explicitly documented
+- Live data must be **cache-only** — never written to RDS — to avoid clashing with the truncate-and-insert nightly loader and to keep the live concern fully separated from the durable data model
+- The wrapper must avoid hammering NBA's CDN — central caching is required; per-user fan-out is unacceptable
+- Failures of the upstream (timeout, rate limit, schema change) must degrade gracefully — neither blank pages nor misleading preview-fallbacks
+- The Game page UI (`frontend/src/routes/GameDetail.tsx`) must integrate live rendering without forking into a separate route — one page, three states (preview / live / final)
+- `Game.status` remains the source of truth for "is this row ingested yet" — wall-clock heuristics must not be used to bypass it
+- Tip-off datetime is already present in the existing `ScheduleLeagueV2` response (`gameDateTimeUTC`) — no new ingestion call should be introduced to obtain it
+
+### Proposed Solution
+
+**Schema amendment.** Add a `tipoff_at` (timezone-aware UTC datetime) column to `Game` following the workflow defined in **FEATURE-007**. Update the schedule parser at `shared/nbajinni_shared/utils.py:276` to read `gameDateTimeUTC` instead of `gameDate`, add `tipoff_at` to both the `.values(...)` and `set_={...}` blocks of the `ingest_schedule` upsert at `shared/nbajinni_shared/utils.py:287-294`, and add `"tipoff_at"` to the `games` set in `loader/main.py:43` (`DATE_COLUMNS`). The deploy sequence (parser change → local alembic → local schedule ingest → JSON export → loader migrate-then-load on RDS) ensures both DBs end up with real values and a NOT NULL constraint, with no nullable phase visible in application code.
+
+**Two backend endpoints, both cached in-process via `cachetools.TTLCache`:**
+
+- `GET /games/live/today` — bulk endpoint wrapping `nba_api.live.nba.endpoints.ScoreBoard`. Returns today's slate with current scores, period, clock, status text, and tip-off times. Single cache key. Variable TTL based on aggregate state of the slate: ~30s while any game is live, ~5 min when all games are over and awaiting ingest, ~30 min when no games have started yet. Powers the front page games widget.
+- `GET /games/live/{game_id}` — per-game endpoint wrapping `nba_api.live.nba.endpoints.BoxScore`. Validates the game exists and `status != 3` (returns DB result if already ingested — short-circuit, no NBA call). Returns full live box score: per-player stats, team aggregates, period breakdowns, arena, officials. Cache key is `game_id`. Variable TTL: ~15-30s while live, ~5-10 min if game appears over but not yet ingested, near-zero (or 404) if tip-off has not passed. Powers the GameDetail page when a game is in live or finished-not-ingested state.
+
+**Frontend routing rule** (used by both the front page widget and the GameDetail page) — keys off `status` and `tipoff_at`, never on wall-clock heuristics alone:
+
+- `status == 3` → DB (`/games/{id}` final result)
+- `status != 3` AND `now < tipoff_at` → DB preview
+- `status != 3` AND `now >= tipoff_at` → live endpoint
+
+**Failure handling.** On upstream failure during a cache miss, serve the most recent stale cache value with a `last_updated_at` field. The frontend renders an "as of HH:MM" badge on stale data. If there is no cache value at all, the endpoint returns a structured error and the frontend hides the live widget without breaking the page.
+
+**Architectural documentation.** Add a new ADR documenting (a) the introduction of a runtime upstream dependency on nba_api, (b) the cache-only-never-RDS rule, (c) TTL strategy and rationale, (d) failure mode contract.
+
+### Tasks
+
+- [x] Add `tipoff_at: Mapped[datetime]` (non-nullable, timezone-aware) to `Game` model in `shared/nbajinni_shared/models/games.py`
+- [x] Write Alembic migration for `tipoff_at` using the FEATURE-007 pattern (NOT NULL with `server_default=sa.func.now()`, then `DROP DEFAULT` immediately after)
+- [x] Update schedule parser at `shared/nbajinni_shared/utils.py:276` to read `gameDateTimeUTC` as a timezone-aware datetime
+- [x] Add `tipoff_at` to both the `.values(...)` and `set_={...}` blocks of the `ingest_schedule` upsert (`shared/nbajinni_shared/utils.py:287-294`) so existing rows are populated on conflict
+- [x] Add `"tipoff_at"` to `DATE_COLUMNS["games"]` in `loader/main.py:43` so the loader hydrates ISO datetime strings from the JSON export
+- [x] Implement `GET /games/live/today` — wraps `nba_api.live.nba.endpoints.ScoreBoard`, in-process `StaleCache` with variable TTL based on slate state, stale-cache fallback on upstream failure
+- [x] Implement `GET /games/live/{game_id}` — wraps `nba_api.live.nba.endpoints.BoxScore`, validates existence + `status != 3` short-circuit + `tipoff_at` pre-game short-circuit, variable TTL, stale-cache fallback
+- [x] Define Pydantic response schemas for both endpoints (`GameLive`, `PlayerLiveStat`, `LiveScoreboardEntry`, `LiveScoreboardResponse`) including `last_updated_at` and `is_stale` for badge rendering
+- [ ] Update `frontend/src/routes/GameDetail.tsx` to apply the three-state routing rule (`status` + `tipoff_at` + `now`) and render full live box score UI when in live state — deferred to Story 6.8.x
+- [ ] Build a `<FreshnessBadge />` component for "as of HH:MM" rendering on stale-cache responses — deferred to frontend integration stories
+- [ ] Update front page games widget (Story 6.6) to call `/games/live/today` and render scores/clocks for in-progress and finished-not-ingested games — deferred to Story 6.6
+- [x] Add a new ADR under `docs/ARCHITECTURE_DECISIONS.md` covering runtime nba_api dependency, cache-only rule, TTL strategy, and failure-mode contract (ADR-007)
+- [ ] Verify end-to-end: live game in progress → bulk endpoint reflects score within TTL; live game over but not ingested → per-game endpoint serves live box score; same game post-ingest → endpoint short-circuits to DB result (requires live NBA game window)
+
+**Deferred frontend work:** GameDetail.tsx integration deferred to Story 6.8.x; front page widget integration deferred to Story 6.6.
+
+---
+
+## FEATURE-007 — Schema Amendment Workflow for Populated Tables
+
+### Status
+
+PROPOSED
+
+### Background
+
+Adding columns to tables that already contain rows is a recurring need as the project's data model evolves. Past amendments (e.g. FEATURE-004's standings work) used Alembic autogen output that adds `nullable=False` columns directly via `op.add_column`. This succeeds only if the target table is empty at migration time — which has worked so far because the loader uses truncate-and-insert and the local DB has been cleared manually before each amendment. That convention is implicit, undocumented, and breaks down the moment a new column needs values derived from data that isn't already in the DB (e.g. an API field that wasn't previously parsed). FEATURE-006 (Live Game Data) is the first amendment that hits this case: `tipoff_at` requires a value pulled from `gameDateTimeUTC` via `ingest_schedule`, and that ingestion must run between the migration and the JSON export — a sequencing requirement that no current docs capture.
+
+### Problem
+
+- Adding `NOT NULL` columns directly via Alembic autogen fails on populated tables — and the loader's `migrate` action runs the migration **before** the truncate (`loader/main.py:120-138`), so on RDS the migration sees a populated table during `action: "migrate"` invocations
+- Making columns nullable as a workaround forces `Optional`/null checks throughout downstream code, undermining the value of the type system; a brief operational window of nullability should not become a permanent application-code concern
+- The deploy choreography needed to populate a new column with real values (parser change → local migrate → ingestion → export → RDS migrate-then-load) is undocumented — engineers approaching FEATURE-006 (and any future similar feature) have no canonical reference and risk inventing the pattern inconsistently
+- The full set of touch points beyond the model and migration — `ingest_*` upsert `set_={...}` dicts, `loader/main.py` `DATE_COLUMNS`, the parser itself — is easy to miss; partial implementations fail silently (e.g. existing rows keep synthesized defaults forever) or loudly (e.g. loader insert errors on missing column) only at integration time
+
+### Constraints
+
+- Pattern must work for both the local DB (upsert-based, persistent across runs) and RDS (truncate-and-insert via the loader Lambda) without divergent logic
+- Pattern must not introduce a nullable phase that surfaces in the application code's type model — DB column is `NOT NULL` from the moment it exists, model is non-nullable, no `Optional` in routers or services
+- Pattern must work with the existing `loader/main.py` migrate-then-load flow without modifying the loader
+- Existing migrations must not be retrofitted — they ran cleanly against empty/cleared tables and rewriting them would be churn for no benefit; this workflow applies prospectively only
+- Documentation must be discoverable from the developer entry points (`CLAUDE.md` and any existing alembic conventions notes) so the workflow is found before mistakes are made
+
+### Proposed Solution
+
+**1. Standard Alembic pattern for adding NOT NULL columns to populated tables**
+
+Use a `server_default` to atomically backfill existing rows during `ALTER TABLE`, then immediately drop the default so future inserts must provide a real value. Synthesized defaults are placeholders that exist only between the migration and the next data-rewriting operation (a truncate on RDS, or an upsert on the local DB).
+
+```python
+def upgrade() -> None:
+    op.add_column(
+        "<table>",
+        sa.Column(
+            "<column>",
+            <type>,
+            nullable=False,
+            server_default=<placeholder_expression>,  # e.g. sa.func.now() for datetimes
+        ),
+    )
+    op.execute("ALTER TABLE <table> ALTER COLUMN <column> DROP DEFAULT")
+
+def downgrade() -> None:
+    op.drop_column("<table>", "<column>")
+```
+
+The distinction matters: `server_default` is part of the column DDL and is applied by Postgres during `ALTER TABLE` to backfill existing rows. A Python-side `default=` does nothing here because Alembic isn't issuing inserts. The `op.execute(...)` line drops the default so the application is forced to provide values from now on.
+
+**2. Codified deploy choreography for amendments that derive values from external data**
+
+When a new column's real values must come from data not already in the DB (an API field that wasn't previously parsed, a computed value, etc.), the sequence is:
+
+1. Single PR contains: model field, migration (server*default + drop), parser update, ingest upsert `set*={...}`update, and any loader`DATE_COLUMNS` update
+2. Run alembic locally → existing local rows briefly hold synthesized defaults
+3. Run the relevant local ingestion path → upsert overwrites synthesized defaults with real values
+4. Export JSON to S3 → captures real values
+5. Invoke loader with `action: "migrate"` → migrates RDS, truncates, reloads with real values from JSON
+
+End state: both DBs have NOT NULL constraint with real values. Synthesized defaults are never visible to users — they exist only inside the migration window on each DB (seconds locally, milliseconds on RDS).
+
+**3. Touch-point checklist**
+
+For each amendment, verify all applicable touch points are updated in the same PR:
+
+- `shared/nbajinni_shared/models/<table>.py` — add the field as non-nullable in the SQLAlchemy model
+- `shared/alembic/versions/<rev>_<name>.py` — migration following the pattern above
+- `shared/nbajinni_shared/utils.py` — parser to extract the value from the source response, **and** the corresponding upsert's `set_={...}` dict so existing rows are populated on conflict (not just on initial insert)
+- `loader/main.py` `DATE_COLUMNS` — if the new column is a date or datetime, add the column name to the relevant table's set so the loader correctly casts ISO strings back to Python types during JSON load
+
+Missing the upsert `set_` update is the highest-risk omission: locally, existing rows keep their synthesized defaults; the JSON export carries those fakes to RDS; symptoms manifest as "every row has the same suspicious value" rather than as a constraint violation.
+
+**4. Optional: helper function**
+
+A small helper in a new `shared/alembic/utils.py` module would standardize the pattern and make intent grep-able:
+
+```python
+def add_required_column(table: str, column: sa.Column) -> None:
+    """Add a NOT NULL column to a populated table.
+
+    The column must declare a `server_default` to backfill existing rows.
+    The default is dropped immediately after the column is created so future
+    inserts are required to provide a real value.
+    """
+    assert column.server_default is not None, "add_required_column requires server_default"
+    op.add_column(table, column)
+    op.execute(f'ALTER TABLE {table} ALTER COLUMN {column.name} DROP DEFAULT')
+```
+
+Whether to introduce the helper or stick with the two-line inline pattern is a small judgment call — the inline form is already short, but the helper makes intent explicit and prevents a future engineer from forgetting the `DROP DEFAULT` step.
+
+### Tasks
+
+- [ ] Decide whether to introduce the `add_required_column` helper or document the inline pattern as a convention; if chosen, add it to a new `shared/alembic/utils.py`
+- [ ] Create `docs/SCHEMA_AMENDMENTS.md` documenting the Alembic pattern, the deploy choreography, and the touch-point checklist
+- [ ] Cross-link `docs/SCHEMA_AMENDMENTS.md` from `CLAUDE.md` under the Project Workflow section so the runbook is found before mistakes are made
+- [ ] Cross-link `docs/SCHEMA_AMENDMENTS.md` from any existing alembic conventions notes (e.g. README sections, `shared/alembic/README` if present)
+- [ ] Add a brief note to `docs/ARCHITECTURE_DECISIONS.md` ADR-005 (or as a new ADR) acknowledging that schema amendments to populated tables follow this workflow, leveraging the loader's migrate-then-load flow
+
+---

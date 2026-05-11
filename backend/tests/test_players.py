@@ -12,17 +12,16 @@ import pytest
 async def test_get_player_season_averages(
     client, test_player, test_player_season_average
 ):
-    response = await client.get(f"/players/{test_player.id}/season-averages")
+    response = await client.get(f"/players/{test_player.id}/season-average")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["player_id"] == test_player.id
-    assert data[0]["season"] == test_player_season_average.season
+    assert data["player_id"] == test_player.id
+    assert data["season"] == test_player_season_average.season
 
 
 @pytest.mark.asyncio
 async def test_get_player_season_averages_not_found(client):
-    response = await client.get("/players/9999999/season-averages")
+    response = await client.get("/players/9999999/season-average")
     assert response.status_code == 404
 
 

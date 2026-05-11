@@ -4,7 +4,7 @@ from nbajinni_shared.utils import compute_player_averages
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.games import Game
-from datetime import date
+from datetime import date, datetime
 
 
 async def _expected_player_averages(session, season, player_id):
@@ -107,6 +107,7 @@ async def test_excludes_other_season(
         home_team_id=test_home_team.id,
         away_team_id=test_away_team.id,
         game_date=date(2023, 10, 1),
+        tipoff_at=datetime(2023, 10, 1, 19, 0),
         season="2023-24",
         status=3,
     )
