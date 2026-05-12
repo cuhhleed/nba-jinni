@@ -57,21 +57,17 @@ function buildRecentGame(game: GameWithTeamStats, teamId: number) {
   if (myTeamStat && oppTeamStat) {
     const won = myTeamStat.points > oppTeamStat.points;
     return (
-      <div className="past-game-container  hover:bg-amber-500/10 py-2">
-        <div className="mx-4 grid grid-cols-3 items-center justify-left">
-          <Link
-            to={`/games/${game.id}`}
-            key={game.id}
-            className="grid grid-cols-2 col-span-2"
-          >
-            <span>{game.game_date}</span>
-            <TeamLogo size="sm" teamId={oppTeamStat.team_id}></TeamLogo>
-          </Link>
-          <span className={won ? "text-green-500" : "text-red-600"}>
-            {myTeamStat.points}-{oppTeamStat.points}
-          </span>
-        </div>
-      </div>
+      <Link
+        to={`/games/${game.id}`}
+        key={game.id}
+        className="grid grid-cols-3 items-center pl-4 hover:bg-amber-500/10"
+      >
+        <span className="text-sm text-gray-900">{game.game_date}</span>
+        <TeamLogo size="sm" teamId={oppTeamStat.team_id} />
+        <span className={won ? "text-green-500" : "text-red-600"}>
+          {myTeamStat.points}-{oppTeamStat.points}
+        </span>
+      </Link>
     );
   }
 }
@@ -95,10 +91,14 @@ function buildNextGame(game: GameBase, teamId: number) {
       : [game.away_team_id, false];
 
   return (
-    <div className="next-game-container grid grid-cols-3 text-gray-900">
-      <span>{game.game_date}</span>
+    <Link
+      to={`/games/${game.id}`}
+      key={game.id}
+      className="grid grid-cols-3 items-center pl-4 hover:bg-amber-500/10"
+    >
+      <span className="text-sm text-gray-900">{game.game_date}</span>
       <TeamLogo size="sm" teamId={oppId}></TeamLogo>
       <span className="text-gray-900">{isHome ? "(H)" : "(A)"}</span>
-    </div>
+    </Link>
   );
 }

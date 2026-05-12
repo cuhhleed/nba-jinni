@@ -50,7 +50,7 @@ export default function Top10Standings() {
               {HEADERS.map((h) => (
                 <span
                   key={h}
-                  className="text-[10px] lg:text-xs text-sky-600 uppercase tracking-wide text-center"
+                  className="text-[10px] lg:text-xs text-sky-600 uppercase tracking-wide text-center self-center"
                 >
                   {h}
                 </span>
