@@ -441,15 +441,15 @@ Tasks:
 
 ---
 
-**Story 6.6 — Front Page** ~~Dashboard~~ [ADR-006]
-_As a user, I want a home landing page surfacing today's games, top players, and standings at a glance._ [ADR-006]
+**Story 6.6 — Front Page** ~~Dashboard~~ [ADR-006, ADR-007]
+_As a user, I want a home landing page surfacing today's games (upcoming, live, and recently completed), top players, top recent performances, and standings at a glance._ [ADR-006]
 
 Tasks:
 
-- [ ] Build `/` front page — today's game schedule widget backed by `GET /games/upcoming` [ADR-006]
-- [ ] Build "top players" widget backed by `GET /players/top/preview` (5 stat categories, top 3 each) [ADR-006]
-- [ ] Build "standings preview" widget backed by `GET /standings/preview` (top 10 cross-conference) [ADR-006]
-- [ ] Add quick-access links to recently viewed players (stored in local state)
+- [ ] Build `/` front page — games widget backed by `GET /games/live/today` [ADR-007]; render a combined slate of upcoming (pre-tip), in-progress (with live score/clock), and recently completed (final score, not-yet-ingested) games using the three-state routing rule (`status`, `tipoff_at`, `now`) defined in FEATURE-006
+- [x] Build "top players" widget backed by `GET /players/top/preview` (5 stat categories, top 3 each) [ADR-006]
+- [x] Build "recent top performances" widget — 3 slots surfacing standout individual game performances from recently completed games
+- [x] Build "standings preview" widget backed by `GET /standings/preview` (top 10 cross-conference) [ADR-006]
 
 ---
 

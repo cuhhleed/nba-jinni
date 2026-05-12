@@ -70,3 +70,24 @@ export type PlayerGameStatWithContext = PlayerGameStat & {
   game_date: string;
   opponent_team_id: number;
 };
+
+export type PlayerSeasonAverageWithPlayer = PlayerSeasonAverage & {
+  player: Player;
+};
+
+export type RecentPerformance = {
+  player_id: number;
+  full_name: string;
+  team_id: number;
+  game_id: string;
+  points: number;
+  tot_reb: number;
+  asts: number;
+  stls: number;
+  blks: number;
+};
+
+export type TopPlayersPreview = Record<
+  "points" | "rebounds" | "assists" | "steals" | "blocks",
+  PlayerSeasonAverageWithPlayer[]
+>;

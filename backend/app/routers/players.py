@@ -1,3 +1,4 @@
+from datetime import date as date_type
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,7 +11,7 @@ from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from ..dependencies import get_db, get_current_season
 from ..schemas.player import PlayerDetail, PlayerBase
-from ..schemas.player_game_stat import PlayerGameStatBase, PlayerGameStatWithContext
+from ..schemas.player_game_stat import PlayerGameStatBase, PlayerGameStatWithContext, RecentPerformance
 from ..schemas.player_season_average import (
     PlayerSeasonAverageBase,
     PlayerSeasonAverageWithPlayer,
@@ -109,6 +110,72 @@ async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
         ]
 
     return result_map
+
+
+@router.get(
+    "/players/top/recent-performances",
+    response_model=list[RecentPerformance],
+)
+async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
+    """
+    Returns up to 3 standout individual performances from the last two ingested game-days.
+
+    Recency is defined relative to the most-recent game_date that has player_game_stats
+    rows — not by calendar offset from now — so UTC/ET drift on west-coast games does
+    not create a one-day gap in results.
+
+    Scoring: base = points + tot_reb + asts + stls + blks.
+    Rows where base < 35 are discarded.  Rows from the most-recent game-day receive a
+    +5 bonus.  Results are sorted by (base + bonus) desc, then base desc as a tie-break.
+    """
+    current_date_utc = date_type.today()
+
+    recent_dates_stmt = (
+        select(Game.game_date)
+        .join(PlayerGameStat, PlayerGameStat.game_id == Game.id)
+        .where(Game.game_date <= current_date_utc)
+        .group_by(Game.game_date)
+        .order_by(Game.game_date.desc())
+        .limit(2)
+    )
+    recent_dates_result = await db.execute(recent_dates_stmt)
+    recent_date_rows = recent_dates_result.scalars().all()
+
+    if not recent_date_rows:
+        return []
+
+    most_recent = recent_date_rows[0]
+    recent_dates = list(recent_date_rows)
+
+    stmt = (
+        select(PlayerGameStat, Game.game_date, Player.first_name, Player.last_name, Player.team_id)
+        .join(Game, PlayerGameStat.game_id == Game.id)
+        .join(Player, PlayerGameStat.player_id == Player.id)
+        .where(Game.game_date.in_(recent_dates))
+    )
+    rows = (await db.execute(stmt)).all()
+
+    scored: list[tuple[int, int, RecentPerformance]] = []
+    for pgs, game_date, first_name, last_name, team_id in rows:
+        base = pgs.points + pgs.tot_reb + pgs.asts + pgs.stls + pgs.blks
+        if base < 35:
+            continue
+        bonus = 5 if game_date == most_recent else 0
+        perf = RecentPerformance(
+            player_id=pgs.player_id,
+            full_name=f"{first_name} {last_name}",
+            team_id=team_id,
+            game_id=pgs.game_id,
+            points=pgs.points,
+            tot_reb=pgs.tot_reb,
+            asts=pgs.asts,
+            stls=pgs.stls,
+            blks=pgs.blks,
+        )
+        scored.append((base + bonus, base, perf))
+
+    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return [perf for _, _, perf in scored[:3]]
 
 
 @router.get(
