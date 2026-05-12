@@ -304,8 +304,8 @@ Identified during Story 6.6 (Front Page) planning when scoping widgets that surf
 - [x] Implement `GET /games/live/today` — wraps `nba_api.live.nba.endpoints.ScoreBoard`, in-process `StaleCache` with variable TTL based on slate state, stale-cache fallback on upstream failure
 - [x] Implement `GET /games/live/{game_id}` — wraps `nba_api.live.nba.endpoints.BoxScore`, validates existence + `status != 3` short-circuit + `tipoff_at` pre-game short-circuit, variable TTL, stale-cache fallback
 - [x] Define Pydantic response schemas for both endpoints (`GameLive`, `PlayerLiveStat`, `LiveScoreboardEntry`, `LiveScoreboardResponse`) including `last_updated_at` and `is_stale` for badge rendering
-- [ ] Update `frontend/src/routes/GameDetail.tsx` to apply the three-state routing rule (`status` + `tipoff_at` + `now`) and render full live box score UI when in live state — deferred to Story 6.8.x
-- [ ] Build a `<FreshnessBadge />` component for "as of HH:MM" rendering on stale-cache responses — deferred to frontend integration stories
+- [x] Update `frontend/src/routes/GameDetail.tsx` to apply the three-state routing rule (`status` + `tipoff_at` + `now`) and render full live box score UI when in live state — deferred to Story 6.8.x
+- [x] Build a `<FreshnessBadge />` component for "as of HH:MM" rendering on stale-cache responses — deferred to frontend integration stories
 - [ ] Update front page games widget (Story 6.6) to call `/games/live/today` and render scores/clocks for in-progress and finished-not-ingested games — deferred to Story 6.6
 - [x] Add a new ADR under `docs/ARCHITECTURE_DECISIONS.md` covering runtime nba_api dependency, cache-only rule, TTL strategy, and failure-mode contract (ADR-007)
 - [ ] Verify end-to-end: live game in progress → bulk endpoint reflects score within TTL; live game over but not ingested → per-game endpoint serves live box score; same game post-ingest → endpoint short-circuits to DB result (requires live NBA game window)
@@ -410,7 +410,6 @@ Whether to introduce the helper or stick with the two-line inline pattern is a s
 
 - [ ] Decide whether to introduce the `add_required_column` helper or document the inline pattern as a convention; if chosen, add it to a new `shared/alembic/utils.py`
 - [ ] Create `docs/SCHEMA_AMENDMENTS.md` documenting the Alembic pattern, the deploy choreography, and the touch-point checklist
-- [ ] Cross-link `docs/SCHEMA_AMENDMENTS.md` from `CLAUDE.md` under the Project Workflow section so the runbook is found before mistakes are made
 - [ ] Cross-link `docs/SCHEMA_AMENDMENTS.md` from any existing alembic conventions notes (e.g. README sections, `shared/alembic/README` if present)
 - [ ] Add a brief note to `docs/ARCHITECTURE_DECISIONS.md` ADR-005 (or as a new ADR) acknowledging that schema amendments to populated tables follow this workflow, leveraging the loader's migrate-then-load flow
 

@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import Navbar from "./components/layout/Navbar";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import GameDetail from "./routes/GameDetail";
+import Home from "./routes/Home";
 import PlayerDetail from "./routes/PlayerDetail";
 import SearchResults from "./routes/SearchResults";
 import Standings from "./routes/Standings";
@@ -18,7 +19,7 @@ function App() {
         <BrowserRouter>
           <Navbar />
           <Routes>
-            <Route path="/" element={<p>Home</p>} />
+            <Route path="/" element={<Home />} />
             <Route path="/teams" element={<Teams />} />
             <Route path="/teams/:id" element={<TeamDetail />} />
             <Route path="/players/:id" element={<PlayerDetail />} />

@@ -120,3 +120,22 @@ export type GameWithTeamStats = GameBase & {
   home_team_stat: TeamGameStat | null;
   away_team_stat: TeamGameStat | null;
 };
+
+export type LiveScoreboardEntry = {
+  id: string;
+  home_team_id: number;
+  away_team_id: number;
+  home_score: number | null;
+  away_score: number | null;
+  period: number | null;
+  game_clock: string | null;
+  game_status_text: string;
+  tipoff_at: string;
+  state: "scheduled" | "live" | "final";
+};
+
+export type LiveScoreboardResponse = {
+  games: LiveScoreboardEntry[];
+  last_updated_at: string;
+  is_stale: boolean;
+};

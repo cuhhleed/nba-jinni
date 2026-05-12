@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { formatStreak } from "../lib/format";
 import PageContainer from "../components/layout/PageContainer";
 import TeamLogo from "../components/teams/TeamLogo";
 import CarpetBadge from "../components/ui/CarpetBadge";
@@ -90,7 +91,7 @@ function StandingRow({
       <span
         className={`text-xs lg:text-sm text-center self-center ${standing.streak > 0 ? "text-green-500" : standing.streak < 0 ? "text-red-600" : "text-gray-400"}`}
       >
-        {standing.streak}
+        {formatStreak(standing.streak)}
       </span>
     </div>
   );

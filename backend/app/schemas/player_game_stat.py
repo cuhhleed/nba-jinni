@@ -50,3 +50,17 @@ class PlayerGameStatWithContext(PlayerGameStatBase):
 
     game_date: date
     opponent_team_id: int
+
+
+class RecentPerformance(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    player_id: int
+    full_name: str
+    team_id: int
+    game_id: str
+    points: int
+    tot_reb: int
+    asts: int
+    stls: int
+    blks: int
