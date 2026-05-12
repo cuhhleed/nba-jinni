@@ -71,7 +71,7 @@ export default function StatLeaders() {
                 (h, i) => (
                   <span
                     key={i}
-                    className="text-[10px] lg:text-xs font-brand text-sky-600 uppercase tracking-wide text-center px-1 self-center"
+                    className="text-[10px] lg:text-xs font-brand text-sky-600 uppercase tracking-wide text-center self-center"
                   >
                     {h}
                   </span>
