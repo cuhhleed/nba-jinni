@@ -446,7 +446,7 @@ _As a user, I want a home landing page surfacing today's games (upcoming, live, 
 
 Tasks:
 
-- [ ] Build `/` front page — games widget backed by `GET /games/live/today` [ADR-007]; render a combined slate of upcoming (pre-tip), in-progress (with live score/clock), and recently completed (final score, not-yet-ingested) games using the three-state routing rule (`status`, `tipoff_at`, `now`) defined in FEATURE-006
+- [x] Build `/` front page — games widget backed by `GET /games/live/today` [ADR-007]; render a combined slate of upcoming (pre-tip), in-progress (with live score/clock), and recently completed (final score, not-yet-ingested) games using the three-state routing rule (`status`, `tipoff_at`, `now`) defined in FEATURE-006
 - [x] Build "top players" widget backed by `GET /players/top/preview` (5 stat categories, top 3 each) [ADR-006]
 - [x] Build "recent top performances" widget — 3 slots surfacing standout individual game performances from recently completed games
 - [x] Build "standings preview" widget backed by `GET /standings/preview` (top 10 cross-conference) [ADR-006]
@@ -478,7 +478,9 @@ Tasks:
 
 ### EPIC 7 — CI/CD Pipeline (GitHub Actions)
 
-**Goal:** Automate testing, building, and deploying every layer of the stack so that a push to `main` results in a live, updated application.
+**Goal:** Automate testing, building, and deploying every layer of the stack so that a push to `main` results in a live `dev` environment, with `prod` promotion gated behind manual approval. Deployment model reflects [ADR-005] (local-cron ingestion + Loader Lambda owns RDS schema), [ADR-007] (live game cache adds `nba_api.live` runtime dep), and [FEATURE-007] (schema amendment choreography).
+
+**Environments:** `dev` auto-deploys on merge to `main`; `prod` deploys via `workflow_dispatch` with GitHub Environment approval.
 
 ---
 
@@ -488,47 +490,120 @@ _As a developer, I want GitHub Actions to authenticate with AWS without storing 
 Tasks:
 
 - [ ] Create an OIDC identity provider in AWS IAM for GitHub Actions
-- [ ] Create an IAM role with appropriate permissions (Lambda deploy, S3 sync, CloudFront invalidation) and trust policy scoped to this repository
-- [ ] Add the IAM role ARN as a GitHub Actions secret (`AWS_ROLE_ARN`)
-- [ ] Verify OIDC auth works with a test workflow
+- [ ] Create separate IAM roles for `dev` and `prod`, with trust policies scoped to this repository and (for prod) the `main` ref
+- [ ] Role permissions: `lambda:UpdateFunctionCode`, `lambda:UpdateFunctionConfiguration`, `lambda:InvokeFunction`, S3 sync (frontend + loader-input buckets), CloudFront invalidation, `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`, `rds:DescribeDBInstances`, `logs:*`
+- [ ] Add `AWS_ROLE_ARN_DEV` and `AWS_ROLE_ARN_PROD` as GitHub Actions secrets
+- [ ] Verify OIDC auth works against each env with a no-op test workflow
 
 ---
 
 **Story 7.2 — Terraform CI workflow**
-_As a developer, I want Terraform plan run on every PR and apply run on merge to main so infrastructure changes are reviewed before applying._
+_As a developer, I want Terraform plan run on every PR and apply run on merge to main so infrastructure changes are reviewed before applying, with prod gated manually._
 
 Tasks:
 
 - [ ] Create `.github/workflows/terraform.yml`
-- [ ] On PR: run `terraform fmt`, `terraform validate`, `terraform plan` — post plan output as PR comment
-- [ ] On merge to `main`: run `terraform apply -auto-approve`
-- [ ] Store Terraform state bucket name and region as GitHub Actions secrets
+- [ ] On PR: run `terraform fmt -check`, `terraform validate`, `terraform plan` against `environments/dev` — post plan output as PR comment
+- [ ] On merge to `main`: run `terraform apply -auto-approve` against `environments/dev`
+- [ ] Add a `workflow_dispatch` job for `environments/prod` apply, requiring GitHub Environment approval
+- [ ] Store Terraform state bucket, region, and lock table name as GitHub Actions secrets
 
 ---
 
-**Story 7.3 — Backend API CI/CD workflow**
-_As a developer, I want the backend automatically tested and deployed to Lambda on every merge to main._
+**Story 7.3 — Backend API Lambda CI/CD workflow**
+_As a developer, I want the backend Lambda automatically tested and deployed to dev on every merge to main, with prod promotion gated manually._
 
 Tasks:
 
 - [ ] Create `.github/workflows/backend.yml`
-- [ ] On PR: run `flake8`, `black --check`, and `pytest`
-- [ ] On merge to `main`: package Lambda zip, run `alembic upgrade head` against RDS, deploy zip to Lambda via AWS CLI
-- [ ] Ensure the backend Lambda zip includes `/shared` as a bundled dependency [ADR-001]
-- [ ] Store DB connection string and Lambda function name as GitHub Actions secrets
-- [ ] Add CI/CD for Loader Lambda deployment (package zip with `/shared`, deploy on merge to main) [ADR-005]
+- [ ] On PR: run `flake8`, `black --check`, and `pytest backend/`
+- [ ] Verify the backend Lambda zip bundles `/shared` [ADR-001] and the `nba_api` runtime dependency [ADR-007]
+- [ ] On merge to `main`: package backend Lambda zip, deploy to dev Lambda via `aws lambda update-function-code`, then run smoke test (`curl $DEV_API/health`, fail if non-200)
+- [ ] Add a `workflow_dispatch` job that promotes the same zip to the prod Lambda alias (manual gate)
+- [ ] Store dev and prod backend Lambda function names as GitHub Actions secrets
+- [ ] Note: schema migrations are owned by the Loader Lambda (Story 7.4); backend CI must NOT run `alembic upgrade head` [ADR-005]
 
 ---
 
-**Story 7.4 — Frontend CI/CD workflow**
-_As a developer, I want the frontend automatically built and deployed to S3/CloudFront on every merge to main._
+**Story 7.4 — Loader Lambda CI/CD workflow**
+_As a developer, I want the Loader Lambda automatically deployed and its `migrate` action invoked as the schema-deploy step, gated per environment._
+
+Tasks:
+
+- [ ] Create `.github/workflows/loader.yml`
+- [ ] On PR: lint + unit-test `loader/`, run the schema-amendment lint (Story 7.5)
+- [ ] On merge to `main`, against dev:
+  - [ ] Build Loader zip via `scripts/package_loader.sh` (bundles `/shared`, Alembic, migrations) [ADR-005]
+  - [ ] Deploy via `aws lambda update-function-code` to the dev Loader Lambda
+  - [ ] Pre-flight: `aws rds describe-db-instances` to confirm reachability
+  - [ ] Invoke Loader with `{"action":"migrate"}`; fail the workflow if the Lambda returns non-200 or surfaces a migration error
+- [ ] Add a `workflow_dispatch` job that repeats the above sequence for prod (manual gate)
+- [ ] Store dev and prod Loader Lambda function names as GitHub Actions secrets
+
+---
+
+**Story 7.5 — Schema amendment lint**
+_As a developer, I want CI to fail fast when a migration omits any [FEATURE-007] touch-point so deploy choreography stays safe._
+
+Tasks:
+
+- [ ] Add `scripts/lint_schema_amendments.py`
+- [ ] On PR diffs touching `alembic/versions/`, fail if a new `NOT NULL` column lacks a `server_default` in the upgrade op
+- [ ] Fail if a new column on a model isn't reflected in the relevant parser map in `shared/utils.py`
+- [ ] Fail if a new date/datetime column isn't added to `loader/main.py` `DATE_COLUMNS`
+- [ ] Fail if upsert `set_={}` clauses aren't updated for new columns
+- [ ] Wire the lint into the PR jobs for `loader.yml` and `backend.yml`
+
+---
+
+**Story 7.6 — Frontend CI/CD workflow**
+_As a developer, I want the frontend automatically built and deployed to S3/CloudFront for dev on every merge to main, with prod promotion gated manually._
 
 Tasks:
 
 - [ ] Create `.github/workflows/frontend.yml`
-- [ ] On PR: run `eslint`, `tsc --noEmit` (type check), `npm run build`
-- [ ] On merge to `main`: run build, sync dist output to S3 bucket, create CloudFront invalidation
-- [ ] Store S3 bucket name and CloudFront distribution ID as GitHub Actions secrets
+- [ ] On PR: run `eslint`, `tsc --noEmit`, and `npm run build`
+- [ ] On merge to `main`: build with `VITE_API_BASE_URL=$DEV_API_URL`, sync dist output to the dev S3 bucket, create a CloudFront invalidation (`/*`), poll until status is `Completed`, then smoke-test (`curl $DEV_FRONTEND_URL/` for 200)
+- [ ] Add a `workflow_dispatch` job that repeats the build/sync/invalidate against prod with the prod API URL (manual gate)
+- [ ] Store dev and prod S3 bucket names, CloudFront distribution IDs, and API base URLs as GitHub Actions secrets
+
+---
+
+**Story 7.7 — Integration E2E test in CI**
+_As a developer, I want CI to exercise the full loader → backend path on dev before any prod promotion can run._
+
+Tasks:
+
+- [ ] Add a post-deploy job in `loader.yml` (dev only) that:
+  - [ ] Uploads a known fixture JSON to the dev S3 loader-input bucket
+  - [ ] Invokes the Loader Lambda with `{"action":"load"}`
+  - [ ] Calls backend endpoints (`/teams`, `/games/{id}`) and asserts expected fixture data
+  - [ ] Tears down the test fixture
+- [ ] Block the prod promotion `workflow_dispatch` jobs (Stories 7.3, 7.4, 7.6) unless this E2E job has passed on the same commit
+
+---
+
+**Story 7.8 — Observability provisioning**
+_As a developer, I want CloudWatch log groups, alarms, and a dashboard provisioned by Terraform so production issues are visible._
+
+Tasks (deployed via Story 7.2's Terraform workflow):
+
+- [ ] CloudWatch log groups for backend Lambda and Loader Lambda, with retention policies
+- [ ] CloudWatch alarms: backend Lambda error rate, backend Lambda duration p99, Loader Lambda failure, RDS connection count
+- [ ] SNS topic for alarm notifications, with an email subscription (address provided as a Terraform variable / GH secret)
+- [ ] Dashboard panels: backend latency, Loader last-success timestamp, CloudFront 5xx rate
+
+---
+
+**Story 7.9 — Local cron ingestion heartbeat**
+_As a developer, I want a heartbeat from the local-cron ingestion job so silent failures are alerted on. Closes the observability gap in [LOCAL_OPERATIONS.md]._
+
+Tasks:
+
+- [ ] On successful local-cron ingestion run, publish a `IngestionHeartbeat` custom metric via `aws cloudwatch put-metric-data`
+- [ ] Provision a CloudWatch alarm that fires if no heartbeat is observed within (ingestion frequency + buffer) hours
+- [ ] Create a dedicated IAM user for the heartbeat with narrow scope (`cloudwatch:PutMetricData` only); store credentials on the local box
+- [ ] Document setup steps in `LOCAL_OPERATIONS.md`
 
 ---
 

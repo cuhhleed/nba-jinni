@@ -38,6 +38,21 @@ _live_cache: StaleCache = StaleCache()
 
 _GAME_STATUS_MAP = {1: "scheduled", 2: "live", 3: "final"}
 
+# nba_api ships a Chrome 87 (Dec 2020) User-Agent that Akamai's bot protection now
+# flags with HTTP 403 + an HTML "Access Denied" page. We override with a current
+# Chrome fingerprint plus Origin/Referer/sec-ch-ua headers.
+_LIVE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Origin": "https://www.nba.com",
+    "Referer": "https://www.nba.com/",
+    "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+}
+
 
 def _bulk_ttl(scoreboard) -> float:
     games = scoreboard.games.get_dict()
@@ -139,7 +154,7 @@ async def get_live_scoreboard():
         return cached
 
     try:
-        data = await asyncio.to_thread(ScoreBoard)
+        data = await asyncio.to_thread(ScoreBoard, headers=_LIVE_HEADERS)
         games_list = data.games.get_dict()
         entries = []
         for g in games_list:
@@ -228,7 +243,7 @@ async def get_live_game(game_id: str, db: AsyncSession = Depends(get_db)):
         return cached
 
     try:
-        box = await asyncio.to_thread(BoxScore, game_id)
+        box = await asyncio.to_thread(BoxScore, game_id, headers=_LIVE_HEADERS)
         game_info = box.game.get_dict()
         home_team_dict = box.home_team.get_dict()
         away_team_dict = box.away_team.get_dict()
