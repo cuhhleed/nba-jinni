@@ -37,7 +37,7 @@ export default function RecentMagicCard({ performance }: Props) {
             size="md"
             className="shrink-0"
           />
-          <span className="text-sm font-semibold text-sky-500 truncate">
+          <span className="text-sm font-semibold text-amber-500 group-hover:text-sky-500 truncate">
             {performance.full_name}
           </span>
         </div>

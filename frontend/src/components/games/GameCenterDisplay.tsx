@@ -1,7 +1,7 @@
-import type { GameDetailResponse } from "../../types/games";
+import type { GamePreview, GameResult } from "../../types/games";
 
 type Props = {
-  game: GameDetailResponse;
+  game: GamePreview | GameResult;
 };
 
 export default function GameCenterDisplay({ game }: Props) {

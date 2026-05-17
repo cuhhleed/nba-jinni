@@ -20,8 +20,6 @@ from nbajinni_shared.session import get_session_factory
 configure_logging()
 logger = get_logger("loader")
 
-AsyncSessionLocal = get_session_factory()
-
 S3_PREFIX = "exports"
 
 # FK-safe insertion order (parents before children)
@@ -73,6 +71,11 @@ def _fetch_json(s3_client, bucket: str, table: str) -> list[dict]:
 
 async def load(bucket: str):
     s3 = boto3.client("s3")
+    # Create the session factory per-invocation so the engine binds to the
+    # current event loop. asyncio.run() creates a fresh loop each invoke, and
+    # migrate() (alembic) opens/closes its own loop first — a module-level
+    # engine ends up holding state from a dead loop.
+    AsyncSessionLocal = get_session_factory()
 
     async with AsyncSessionLocal() as session:
         async with session.begin():

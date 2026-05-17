@@ -1,10 +1,10 @@
-import type { GameDetailResponse } from "../../types/games";
+import type { GamePreview, GameResult } from "../../types/games";
 import CarpetBadge from "../ui/CarpetBadge";
 import GameCenterDisplay from "./GameCenterDisplay";
 import TeamGameBadge from "./TeamGameBadge";
 
 type Props = {
-  game: GameDetailResponse;
+  game: GamePreview | GameResult;
 };
 
 export default function GameBanner({ game }: Props) {

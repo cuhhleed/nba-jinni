@@ -34,15 +34,9 @@ export default function GameCarpetBadge({
   return (
     <Link
       to={`/games/${entry.id}`}
-      className="block flex-shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] mx-2 group"
+      className="block flex-shrink-0 w-[calc((100%-32px)/2)] sm:w-[calc((100%-64px)/3)] lg:w-[calc((100%-96px)/4)] group"
     >
       <CarpetBadge hoverable size="sm" className="p-2 h-full group-hover:bg-amber-500">
-        {entry.state === "final" && (
-          <span className="absolute top-1 right-2 text-[10px] uppercase tracking-wide text-sky-500">
-            Final
-          </span>
-        )}
-
         {entry.state === "live" && (
           <div className="flex items-center gap-1.5 mb-1">
             <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse inline-block" />
@@ -52,7 +46,11 @@ export default function GameCarpetBadge({
           </div>
         )}
 
-        <div className="flex flex-col gap-1 mt-1">
+        <div
+          className={`flex flex-col gap-1 mt-1 ${
+            entry.state !== "live" ? "mt-2" : ""
+          } ${entry.state === "scheduled" ? "items-center" : ""}`}
+        >
           <div className="flex items-center justify-between gap-1">
             <div className="flex items-center gap-1 min-w-0">
               <TeamLogo teamId={entry.home_team_id} size="sm" className="shrink-0" />
@@ -98,14 +96,31 @@ export default function GameCarpetBadge({
           </div>
         </div>
 
+        {entry.state === "final" && (
+          <div className="text-center">
+            <p className="text-[11px] text-amber-500 group-hover:text-sky-500 text-center mt-3">
+              Final
+            </p>
+          </div>
+        )}
+
         {entry.state === "scheduled" && (
-          <p className="text-[10px] text-amber-400 text-center mt-1.5">{tipoffLocal}</p>
+          <div className="text-center">
+            <span className="text-[10px] text-amber-500 group-hover:text-sky-500 text-center mt-1.5">
+              {tipoffLocal}
+            </span>
+          </div>
         )}
 
         {entry.state === "live" && entry.game_clock && (
-          <p className="text-[10px] text-sky-400 text-center mt-1">
-            Q{entry.period} {entry.game_clock}
-          </p>
+          <div className="text-center">
+            <span className="text-[10px] text-amber-500 group-hover:text-sky-500 text-center mt-1">
+              Q{entry.period}{" "}
+            </span>
+            <span className="text-[10px] text-amber-500 group-hover:text-sky-500 text-center mt-1">
+              {entry.game_clock.slice(2, 4)}:{entry.game_clock.slice(5, 7)}
+            </span>
+          </div>
         )}
       </CarpetBadge>
     </Link>

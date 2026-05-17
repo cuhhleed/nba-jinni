@@ -159,3 +159,31 @@ resource "aws_vpc_endpoint" "s3" {
     Name = "${var.project_name}-${var.environment}-s3-vpce"
   }
 }
+
+# NAT Gateway (ADR-008) - enables backend Lambda in private subnets to reach the
+# public NBA live-data API. Single-AZ deployment in public_1 to minimize cost
+# (~$32/mo); cross-AZ traffic from private_2 is acceptable for dev.
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-nat-eip"
+  }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public_1.id
+
+  depends_on = [aws_internet_gateway.igw]
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-NAT"
+  }
+}
+
+resource "aws_route" "private_internet" {
+  route_table_id         = aws_route_table.private_route_table.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.main.id
+}

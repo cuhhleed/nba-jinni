@@ -109,23 +109,33 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
+module "s3_lambda_artifacts" {
+  source = "../../modules/s3"
+
+  project_name = var.project_name
+  environment  = var.environment
+  bucket_name  = "lambda-artifacts"
+}
+
 module "lambda_backend" {
   source = "../../modules/lambda"
 
   project_name       = var.project_name
   environment        = var.environment
   function_name      = "request-handler"
-  filename           = "../../placeholder_backend.zip"
+  s3_bucket          = module.s3_lambda_artifacts.bucket_id
+  s3_key             = "backend.zip"
   role               = aws_iam_role.lambda_exec.arn
-  handler            = "main.handler"
-  subnet_ids         = module.vpc.public_subnet_ids
+  handler            = "app.main.handler"
+  subnet_ids         = module.vpc.private_subnet_ids
   security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
-    DB_HOST     = module.rds.endpoint
-    DB_NAME     = module.rds.db_name
-    DB_USER     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
-    DB_PASSWORD = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
+    DB_HOST         = module.rds.endpoint
+    DB_NAME         = module.rds.db_name
+    DB_USER         = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
+    DB_PASSWORD     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
+    FRONTEND_ORIGIN = "https://${module.cloudfront_frontend.domain_name}"
   }
 }
 

@@ -8,14 +8,17 @@ resource "aws_cloudwatch_log_group" "lambda_log" {
 }
 
 resource "aws_lambda_function" "main" {
-  filename                           = var.filename
   function_name                      = "${var.project_name}-${var.environment}-${var.function_name}"
   role                               = var.role
   runtime                            = "python3.12"
   handler                            = var.handler
   memory_size                        = var.memory_size
   timeout                            = var.timeout
-  source_code_hash                   = filebase64sha256(var.filename)
+  filename                           = var.filename
+  s3_bucket                          = var.s3_bucket
+  s3_key                             = var.s3_key
+  s3_object_version                  = var.s3_object_version
+  source_code_hash                   = var.filename != null ? filebase64sha256(var.filename) : null
   replace_security_groups_on_destroy = var.replace_security_groups_on_destroy
   replacement_security_group_ids     = var.replacement_security_group_ids
 

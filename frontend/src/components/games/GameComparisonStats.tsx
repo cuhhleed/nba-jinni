@@ -1,9 +1,9 @@
-import type { GameDetailResponse } from "../../types/games";
+import type { GamePreview, GameResult } from "../../types/games";
 import EmptyState from "../ui/EmptyState";
 import PairedStatBubble from "./PairedStatBubble";
 
 type Props = {
-  game: GameDetailResponse;
+  game: GamePreview | GameResult;
 };
 
 type StatDef = {

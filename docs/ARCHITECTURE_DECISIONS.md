@@ -495,3 +495,147 @@ The per-game endpoint adds a DB validation pass before the upstream call: if `ga
 
 - `GameDetail.tsx` integration: deferred to Story 6.8.x. The `/games/live/{game_id}` endpoint is complete; the frontend component to consume it is not yet built.
 - Front page widget integration: deferred to Story 6.6. The `/games/live/today` endpoint is complete; the frontend component is not yet built.
+
+---
+
+## ADR-008 — NAT Gateway for live-data egress (interim), with split-Lambda migration plan
+
+**Date:** Epic 7 deployment / post-FEATURE-006
+**Status:** Accepted (NAT Gateway, interim) / Proposed (split-Lambda end state)
+
+### Context
+
+ADR-005 chose a hybrid local-cloud ingestion model specifically to **avoid** a NAT Gateway, on the basis that no Lambda on the request path needed internet access — ingestion ran locally, the Loader Lambda needed only S3 (via free Gateway Endpoint) and RDS, and the backend Lambda was a pure RDS reader.
+
+ADR-007 (FEATURE-006) changed that premise. It introduced two backend endpoints — `GET /games/live/today` and `GET /games/live/{game_id}` — that call `nba_api.live` synchronously on the request path. These calls hit `https://cdn.nba.com/...` and require outbound HTTPS from the backend Lambda. The ADR was written and merged before deployment surfaced the missing connectivity, so the gap was not flagged at the time.
+
+First-deploy testing of the live endpoints returned `503 "Live data unavailable"` after a 15-second hang on every call. Root cause: the backend Lambda was placed in `public_subnet_ids` with the assumption that public subnets ⇒ internet access. AWS Lambda Hyperplane ENIs never receive public IPs, so traffic to the IGW has no return path regardless of subnet routing — the same constraint ADR-005 originally documented. The backend therefore had RDS access (in-VPC) but no internet.
+
+A frontend-only workaround was explored: have the browser fetch directly from `cdn.nba.com`. The CDN does not return permissive CORS headers for our origin, so the browser blocks the request. Confirmed empirically.
+
+This leaves three viable architectures:
+
+| Option | Cost | Complexity | Notes |
+|---|---|---|---|
+| **A. NAT Gateway** | ~$32/mo + data | Trivial Terraform diff | Backend stays a single Lambda, moves to private subnets. Standard AWS pattern. |
+| **B. Split live endpoints into a non-VPC Lambda** | $0 | New deployment unit, API Gateway routing changes | Live endpoints get free egress; main backend keeps VPC for RDS; NAT not needed. |
+| **C. Make RDS publicly accessible, drop VPC from backend** | $0 | Trivial | Real security regression — RDS exposed to the public internet even if SG-locked. Not viable. |
+
+### Decision
+
+A two-phase architecture: deploy NAT Gateway now (Phase 1), migrate to split-Lambda when ready (Phase 2).
+
+#### Phase 1 — NAT Gateway (Accepted, this PR)
+
+Provision a single NAT Gateway in `public_1` with an Elastic IP, add a `0.0.0.0/0 → NAT` route to the private route table, and move the backend Lambda from `public_subnet_ids` to `private_subnet_ids`. Loader and RDS configuration are unaffected (already in private subnets).
+
+Single-AZ NAT was chosen over HA (one NAT per AZ) because the cost ratio (~$32/mo single vs ~$66/mo HA) does not justify HA for a dev environment with no SLA. Cross-AZ NAT traffic from `private_2` is a minor latency and data-transfer cost, acceptable here.
+
+#### Phase 2 — Split-Lambda end state (Proposed, future work)
+
+The live endpoints have **no DB dependency** for the bulk endpoint (`/games/live/today` is a pure passthrough), and the per-game endpoint's DB lookup is small enough to be replaced by a cross-Lambda HTTP hop or by replicating the lookup in the live Lambda's own minimal SQLAlchemy session. Either way, the live endpoints can run in an unattached (non-VPC) Lambda with native internet access, eliminating NAT cost entirely.
+
+End state:
+
+```
+                      ┌─────────────────────────────────┐
+                      │ API Gateway (HTTP)              │
+                      └────────────┬────────────────────┘
+                                   │ /games/live/* ───┐
+                                   │ everything else  │
+                                   ▼                  ▼
+                       ┌──────────────────┐  ┌──────────────────┐
+                       │ lambda_backend   │  │ lambda_backend_  │
+                       │ (VPC, RDS)       │  │ live (no VPC,    │
+                       │ no nba_api dep   │  │  internet OK)    │
+                       └────────┬─────────┘  └────────┬─────────┘
+                                │                     │
+                                ▼                     ▼
+                              RDS                  cdn.nba.com
+```
+
+The NAT Gateway, EIP, and private-route `0.0.0.0/0` entry are decommissioned. Backend Lambda stays in private subnets — RDS is in-VPC, no internet needed for the main path.
+
+### Migration plan (Phase 2)
+
+The plan below is the prescription to execute when migrating off NAT. It is intentionally detailed so a future executor (human or agent) can implement without re-deriving decisions.
+
+**1. New package: `backend_live/`**
+   - Mirrors `backend/app/` structure, but contains only:
+     - `app/main.py` — FastAPI app with `app.include_router(games_live.router)` and Mangum handler
+     - `app/routers/games_live.py` — the two live endpoints, lifted from `backend/app/routers/games.py` lines 148-302
+     - `app/cache/stale_cache.py` — copied (or shared via `/shared` if promoted; see note below)
+     - `app/schemas/game.py` — only the Pydantic shapes the live endpoints use (`LiveScoreboardResponse`, `LiveScoreboardEntry`, `GameLive`, `PlayerLiveStat`)
+   - Dependencies: `fastapi`, `mangum`, `nba-api`, `pydantic`, `structlog`. **No** SQLAlchemy, asyncpg, or RDS env vars.
+   - For the per-game endpoint's DB lookup: easiest is to keep that endpoint on the main backend and have the frontend make two calls (one for game metadata via main backend, one for live data via live Lambda). Cleanest separation, lowest coupling. Alternative: live Lambda makes an HTTP call to the main backend's `/games/{game_id}` to validate state — adds a hop but keeps the contract single-Lambda.
+
+**2. New script: `scripts/package_backend_live.sh`**
+   - Pattern: copy of `scripts/package_backend.sh` with `DIST_DIR=backend_live/dist`, `ZIP_PATH=infra/backend_live.zip`, pip install list trimmed to (fastapi, mangum, nba-api, pydantic, structlog).
+   - **Significantly smaller zip** — no pandas/numpy via nba_api's transitive deps? Actually `nba_api.live` does NOT depend on pandas; pandas comes in via `nba_api.stats.*` modules. Confirm by `import nba_api.live.nba.endpoints` in isolation and inspecting the import tree. If clean, the live zip stays well under the 50MB direct-upload limit and does not need S3-backed deploy.
+
+**3. New script: `scripts/deploy_backend_live.sh`**
+   - If zip < 50MB: use direct `aws lambda update-function-code --zip-file fileb://...`.
+   - Otherwise: reuse the S3 artifacts bucket pattern from ADR-008-Phase-1 (`scripts/deploy_backend.sh`).
+
+**4. Terraform changes**
+   - Add `module "lambda_backend_live"` using the existing `infra/modules/lambda/` module. **No** `subnet_ids` / `security_group_ids` (omit entirely to skip `vpc_config`). The module currently requires those — extend the module to make them optional (default `null`), or use a thin wrapper.
+   - Update `infra/modules/api_gateway/` to support routing rules. The current module hardcodes `ANY /{proxy+}` to a single Lambda. Either:
+     - (a) Add a second route `ANY /games/live/{proxy+}` with higher priority pointing at `lambda_backend_live`, OR
+     - (b) Use API Gateway HTTP API's built-in route precedence (longer paths win).
+   - Remove `aws_eip.nat`, `aws_nat_gateway.main`, `aws_route.private_internet` from `infra/modules/vpc/main.tf`.
+   - Remove `nba-api` from `scripts/package_backend.sh` pip-install list. Drop the import in `backend/app/routers/games.py` (the live endpoints are gone from this file by now).
+
+**5. Backend code cleanup**
+   - Delete the live endpoint handlers from `backend/app/routers/games.py`.
+   - Delete `backend/app/cache/stale_cache.py` if not referenced elsewhere (or promote to `/shared` if reused).
+   - Drop `nba-api` from `backend/pyproject.toml` runtime deps.
+
+**6. Frontend integration**
+   - If the live Lambda lives on the same API Gateway, no frontend change — same base URL.
+   - If on a separate domain (e.g., own API Gateway), add a second axios client in `frontend/src/lib/` and switch the live React Query hooks to use it.
+
+**7. Decommission order**
+   - Deploy live Lambda + API Gateway routing first; confirm `/games/live/today` returns data from the new Lambda (check CloudWatch log group).
+   - Only then redeploy the slimmed main backend (without nba_api).
+   - Only then `terraform apply` the VPC module changes that remove the NAT Gateway.
+
+### Consequences
+
+**Positive (Phase 1):**
+
+- Unblocks live-data endpoints immediately with a 5-line VPC diff. No code changes.
+- NAT also benefits Loader Lambda (now has internet too) — useful if Loader ever needs to call an external service for enrichment.
+- Fully reversible — remove the NAT resources and revert the subnet-ids change.
+
+**Positive (Phase 2):**
+
+- Eliminates ~$32/mo recurring NAT cost.
+- Cleanly separates concerns: DB-bound logic in VPC, internet-bound logic outside.
+- Shrinks the main backend Lambda zip meaningfully (no nba_api → no transitively-pulled deps). May allow reverting from S3-backed deploy back to direct upload.
+- Failure isolation: live API outages (Akamai rate limits, NBA CDN hiccups) cannot impact the DB-serving backend's cold-start time or memory budget.
+
+**Negative / Watch points (Phase 1):**
+
+- NAT Gateway is the single largest line item on the dev AWS bill (~$32/mo + ~$0.045/GB processed). For a dev env with low traffic, total ~$35–40/mo. Plan to migrate to Phase 2 before this compounds.
+- Single-AZ NAT is a single point of failure. If `us-east-1a` has an AZ-level outage, all backend Lambda outbound traffic fails. Acceptable for dev; would not be for prod.
+- Cross-AZ data transfer from `private_2` Lambdas to the NAT in `private_1`'s AZ incurs ~$0.01/GB. Negligible at dev scale.
+
+**Negative / Watch points (Phase 2):**
+
+- Two Lambda functions to deploy, monitor, and version. More CI complexity.
+- The per-game live endpoint's DB lookup splits across two services — either the frontend orchestrates two calls or one Lambda calls the other over HTTP. Either way, more moving parts than the single-Lambda model.
+- API Gateway routing precedence must be configured carefully. A misrouted `/games/live/foo` going to the main backend would 404 silently (handler doesn't exist there post-migration); a misrouted `/games/foo` going to the live Lambda would 404 the same way.
+- `StaleCache` is process-local. Splitting concerns means the cache can no longer be shared across endpoints — acceptable since the only consumers were the live endpoints themselves.
+
+**Reversibility:**
+
+Phase 1 is fully reversible — delete NAT resources, switch backend back to public subnets (or keep in private if that's fine; backend doesn't need internet without the live endpoints).
+
+Phase 2 is reversible by re-merging the live router into the main backend and re-adding NAT. The cost of reversal is mostly code-move work; Terraform state changes are straightforward.
+
+### Impact on project plan / docs
+
+- **Update ADR-005 cross-reference:** ADR-005's "no NAT" stance was correct under its scope (ingestion). The runtime live-data path introduced by ADR-007 falls outside that scope and motivates Phase 1 here. No edit to ADR-005 — its decision remains valid for its stated context.
+- **Update ADR-007 watch points:** add a note that runtime upstream dependency on the request path now also requires outbound network configuration, addressed by ADR-008.
+- **Story 7.x (CI/CD):** when Phase 2 lands, the backend CI workflow (Story 7.3) needs a sibling workflow for `backend_live`. Defer until Phase 2 is scheduled.
+- **PENDING_FEATURES.md:** add an entry pointing to ADR-008 Phase 2 as a planned cost-optimization migration (out of scope this iteration).

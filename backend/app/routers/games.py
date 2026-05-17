@@ -17,7 +17,6 @@ from ..dependencies import get_db, get_current_season
 from ..cache.stale_cache import StaleCache
 from ..schemas.game import (
     GameBase,
-    GameWithTeams,
     GamePreview,
     GameResult,
     GameDetailResponse,
@@ -158,6 +157,11 @@ async def get_live_scoreboard():
         games_list = data.games.get_dict()
         entries = []
         for g in games_list:
+            # The NBA pre-schedules "if necessary" playoff slots; these phantom entries
+            # carry "TBD" as the status text until the game is confirmed.
+            if g.get("gameStatusText", "").strip().upper() == "TBD":
+                continue
+            tipoff_at = datetime.fromisoformat(g["gameTimeUTC"].replace("Z", "+00:00"))
             status_int = g.get("gameStatus", 1)
             state = _GAME_STATUS_MAP.get(status_int, "scheduled")
             home_score = g["homeTeam"].get("score") if status_int in (2, 3) else None
@@ -174,7 +178,7 @@ async def get_live_scoreboard():
                     period=period,
                     game_clock=game_clock,
                     game_status_text=g.get("gameStatusText", ""),
-                    tipoff_at=datetime.fromisoformat(g["gameTimeUTC"].replace("Z", "+00:00")),
+                    tipoff_at=tipoff_at,
                     state=state,
                 )
             )
@@ -197,7 +201,9 @@ async def get_live_scoreboard():
         stale_response = value.model_copy(
             update={
                 "is_stale": True,
-                "last_updated_at": datetime.fromtimestamp(last_updated_at_epoch, tz=timezone.utc),
+                "last_updated_at": datetime.fromtimestamp(
+                    last_updated_at_epoch, tz=timezone.utc
+                ),
             }
         )
         logger.warning(
@@ -229,7 +235,11 @@ async def get_live_game(game_id: str, db: AsyncSession = Depends(get_db)):
             detail="Game is final; use /games/{game_id}",
         )
     now = datetime.now(timezone.utc)
-    tipoff = game.tipoff_at.replace(tzinfo=timezone.utc) if game.tipoff_at.tzinfo is None else game.tipoff_at
+    tipoff = (
+        game.tipoff_at.replace(tzinfo=timezone.utc)
+        if game.tipoff_at.tzinfo is None
+        else game.tipoff_at
+    )
     if now < tipoff:
         raise HTTPException(
             status_code=409,
@@ -272,7 +282,9 @@ async def get_live_game(game_id: str, db: AsyncSession = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.warning("live_upstream_failed", endpoint="per_game", error=str(e), game_id=game_id)
+        logger.warning(
+            "live_upstream_failed", endpoint="per_game", error=str(e), game_id=game_id
+        )
         stale = _live_cache.get_stale(cache_key)
         if stale is None:
             raise HTTPException(status_code=503, detail="Live data unavailable")
@@ -280,7 +292,9 @@ async def get_live_game(game_id: str, db: AsyncSession = Depends(get_db)):
         stale_response = value.model_copy(
             update={
                 "is_stale": True,
-                "last_updated_at": datetime.fromtimestamp(last_updated_at_epoch, tz=timezone.utc),
+                "last_updated_at": datetime.fromtimestamp(
+                    last_updated_at_epoch, tz=timezone.utc
+                ),
             }
         )
         logger.warning(
