@@ -495,3 +495,348 @@ The per-game endpoint adds a DB validation pass before the upstream call: if `ga
 
 - `GameDetail.tsx` integration: deferred to Story 6.8.x. The `/games/live/{game_id}` endpoint is complete; the frontend component to consume it is not yet built.
 - Front page widget integration: deferred to Story 6.6. The `/games/live/today` endpoint is complete; the frontend component is not yet built.
+
+---
+
+## ADR-008 — NAT Gateway for live-data egress (interim), with split-Lambda migration plan
+
+**Date:** Epic 7 deployment / post-FEATURE-006
+**Status:** Accepted (NAT Gateway, interim) / Proposed (split-Lambda end state)
+
+### Context
+
+ADR-005 chose a hybrid local-cloud ingestion model specifically to **avoid** a NAT Gateway, on the basis that no Lambda on the request path needed internet access — ingestion ran locally, the Loader Lambda needed only S3 (via free Gateway Endpoint) and RDS, and the backend Lambda was a pure RDS reader.
+
+ADR-007 (FEATURE-006) changed that premise. It introduced two backend endpoints — `GET /games/live/today` and `GET /games/live/{game_id}` — that call `nba_api.live` synchronously on the request path. These calls hit `https://cdn.nba.com/...` and require outbound HTTPS from the backend Lambda. The ADR was written and merged before deployment surfaced the missing connectivity, so the gap was not flagged at the time.
+
+First-deploy testing of the live endpoints returned `503 "Live data unavailable"` after a 15-second hang on every call. Root cause: the backend Lambda was placed in `public_subnet_ids` with the assumption that public subnets ⇒ internet access. AWS Lambda Hyperplane ENIs never receive public IPs, so traffic to the IGW has no return path regardless of subnet routing — the same constraint ADR-005 originally documented. The backend therefore had RDS access (in-VPC) but no internet.
+
+A frontend-only workaround was explored: have the browser fetch directly from `cdn.nba.com`. The CDN does not return permissive CORS headers for our origin, so the browser blocks the request. Confirmed empirically.
+
+This leaves three viable architectures:
+
+| Option | Cost | Complexity | Notes |
+|---|---|---|---|
+| **A. NAT Gateway** | ~$32/mo + data | Trivial Terraform diff | Backend stays a single Lambda, moves to private subnets. Standard AWS pattern. |
+| **B. Split live endpoints into a non-VPC Lambda** | $0 | New deployment unit, API Gateway routing changes | Live endpoints get free egress; main backend keeps VPC for RDS; NAT not needed. |
+| **C. Make RDS publicly accessible, drop VPC from backend** | $0 | Trivial | Real security regression — RDS exposed to the public internet even if SG-locked. Not viable. |
+
+### Decision
+
+A two-phase architecture: deploy NAT Gateway now (Phase 1), migrate to split-Lambda when ready (Phase 2).
+
+#### Phase 1 — NAT Gateway (Accepted, this PR)
+
+Provision a single NAT Gateway in `public_1` with an Elastic IP, add a `0.0.0.0/0 → NAT` route to the private route table, and move the backend Lambda from `public_subnet_ids` to `private_subnet_ids`. Loader and RDS configuration are unaffected (already in private subnets).
+
+Single-AZ NAT was chosen over HA (one NAT per AZ) because the cost ratio (~$32/mo single vs ~$66/mo HA) does not justify HA for a dev environment with no SLA. Cross-AZ NAT traffic from `private_2` is a minor latency and data-transfer cost, acceptable here.
+
+#### Phase 2 — Split-Lambda end state (Proposed, future work)
+
+The live endpoints have **no DB dependency** for the bulk endpoint (`/games/live/today` is a pure passthrough), and the per-game endpoint's DB lookup is small enough to be replaced by a cross-Lambda HTTP hop or by replicating the lookup in the live Lambda's own minimal SQLAlchemy session. Either way, the live endpoints can run in an unattached (non-VPC) Lambda with native internet access, eliminating NAT cost entirely.
+
+End state:
+
+```
+                      ┌─────────────────────────────────┐
+                      │ API Gateway (HTTP)              │
+                      └────────────┬────────────────────┘
+                                   │ /games/live/* ───┐
+                                   │ everything else  │
+                                   ▼                  ▼
+                       ┌──────────────────┐  ┌──────────────────┐
+                       │ lambda_backend   │  │ lambda_backend_  │
+                       │ (VPC, RDS)       │  │ live (no VPC,    │
+                       │ no nba_api dep   │  │  internet OK)    │
+                       └────────┬─────────┘  └────────┬─────────┘
+                                │                     │
+                                ▼                     ▼
+                              RDS                  cdn.nba.com
+```
+
+The NAT Gateway, EIP, and private-route `0.0.0.0/0` entry are decommissioned. Backend Lambda stays in private subnets — RDS is in-VPC, no internet needed for the main path.
+
+### Migration plan (Phase 2)
+
+The plan below is the prescription to execute when migrating off NAT. It is intentionally detailed so a future executor (human or agent) can implement without re-deriving decisions.
+
+**1. New package: `backend_live/`**
+   - Mirrors `backend/app/` structure, but contains only:
+     - `app/main.py` — FastAPI app with `app.include_router(games_live.router)` and Mangum handler
+     - `app/routers/games_live.py` — the two live endpoints, lifted from `backend/app/routers/games.py` lines 148-302
+     - `app/cache/stale_cache.py` — copied (or shared via `/shared` if promoted; see note below)
+     - `app/schemas/game.py` — only the Pydantic shapes the live endpoints use (`LiveScoreboardResponse`, `LiveScoreboardEntry`, `GameLive`, `PlayerLiveStat`)
+   - Dependencies: `fastapi`, `mangum`, `nba-api`, `pydantic`, `structlog`. **No** SQLAlchemy, asyncpg, or RDS env vars.
+   - For the per-game endpoint's DB lookup: easiest is to keep that endpoint on the main backend and have the frontend make two calls (one for game metadata via main backend, one for live data via live Lambda). Cleanest separation, lowest coupling. Alternative: live Lambda makes an HTTP call to the main backend's `/games/{game_id}` to validate state — adds a hop but keeps the contract single-Lambda.
+
+**2. New script: `scripts/package_backend_live.sh`**
+   - Pattern: copy of `scripts/package_backend.sh` with `DIST_DIR=backend_live/dist`, `ZIP_PATH=infra/backend_live.zip`, pip install list trimmed to (fastapi, mangum, nba-api, pydantic, structlog).
+   - **Significantly smaller zip** — no pandas/numpy via nba_api's transitive deps? Actually `nba_api.live` does NOT depend on pandas; pandas comes in via `nba_api.stats.*` modules. Confirm by `import nba_api.live.nba.endpoints` in isolation and inspecting the import tree. If clean, the live zip stays well under the 50MB direct-upload limit and does not need S3-backed deploy.
+
+**3. New script: `scripts/deploy_backend_live.sh`**
+   - If zip < 50MB: use direct `aws lambda update-function-code --zip-file fileb://...`.
+   - Otherwise: reuse the S3 artifacts bucket pattern from ADR-008-Phase-1 (`scripts/deploy_backend.sh`).
+
+**4. Terraform changes**
+   - Add `module "lambda_backend_live"` using the existing `infra/modules/lambda/` module. **No** `subnet_ids` / `security_group_ids` (omit entirely to skip `vpc_config`). The module currently requires those — extend the module to make them optional (default `null`), or use a thin wrapper.
+   - Update `infra/modules/api_gateway/` to support routing rules. The current module hardcodes `ANY /{proxy+}` to a single Lambda. Either:
+     - (a) Add a second route `ANY /games/live/{proxy+}` with higher priority pointing at `lambda_backend_live`, OR
+     - (b) Use API Gateway HTTP API's built-in route precedence (longer paths win).
+   - Remove `aws_eip.nat`, `aws_nat_gateway.main`, `aws_route.private_internet` from `infra/modules/vpc/main.tf`.
+   - Remove `nba-api` from `scripts/package_backend.sh` pip-install list. Drop the import in `backend/app/routers/games.py` (the live endpoints are gone from this file by now).
+
+**5. Backend code cleanup**
+   - Delete the live endpoint handlers from `backend/app/routers/games.py`.
+   - Delete `backend/app/cache/stale_cache.py` if not referenced elsewhere (or promote to `/shared` if reused).
+   - Drop `nba-api` from `backend/pyproject.toml` runtime deps.
+
+**6. Frontend integration**
+   - If the live Lambda lives on the same API Gateway, no frontend change — same base URL.
+   - If on a separate domain (e.g., own API Gateway), add a second axios client in `frontend/src/lib/` and switch the live React Query hooks to use it.
+
+**7. Decommission order**
+   - Deploy live Lambda + API Gateway routing first; confirm `/games/live/today` returns data from the new Lambda (check CloudWatch log group).
+   - Only then redeploy the slimmed main backend (without nba_api).
+   - Only then `terraform apply` the VPC module changes that remove the NAT Gateway.
+
+### Consequences
+
+**Positive (Phase 1):**
+
+- Unblocks live-data endpoints immediately with a 5-line VPC diff. No code changes.
+- NAT also benefits Loader Lambda (now has internet too) — useful if Loader ever needs to call an external service for enrichment.
+- Fully reversible — remove the NAT resources and revert the subnet-ids change.
+
+**Positive (Phase 2):**
+
+- Eliminates ~$32/mo recurring NAT cost.
+- Cleanly separates concerns: DB-bound logic in VPC, internet-bound logic outside.
+- Shrinks the main backend Lambda zip meaningfully (no nba_api → no transitively-pulled deps). May allow reverting from S3-backed deploy back to direct upload.
+- Failure isolation: live API outages (Akamai rate limits, NBA CDN hiccups) cannot impact the DB-serving backend's cold-start time or memory budget.
+
+**Negative / Watch points (Phase 1):**
+
+- NAT Gateway is the single largest line item on the dev AWS bill (~$32/mo + ~$0.045/GB processed). For a dev env with low traffic, total ~$35–40/mo. Plan to migrate to Phase 2 before this compounds.
+- Single-AZ NAT is a single point of failure. If `us-east-1a` has an AZ-level outage, all backend Lambda outbound traffic fails. Acceptable for dev; would not be for prod.
+- Cross-AZ data transfer from `private_2` Lambdas to the NAT in `private_1`'s AZ incurs ~$0.01/GB. Negligible at dev scale.
+
+**Negative / Watch points (Phase 2):**
+
+- Two Lambda functions to deploy, monitor, and version. More CI complexity.
+- The per-game live endpoint's DB lookup splits across two services — either the frontend orchestrates two calls or one Lambda calls the other over HTTP. Either way, more moving parts than the single-Lambda model.
+- API Gateway routing precedence must be configured carefully. A misrouted `/games/live/foo` going to the main backend would 404 silently (handler doesn't exist there post-migration); a misrouted `/games/foo` going to the live Lambda would 404 the same way.
+- `StaleCache` is process-local. Splitting concerns means the cache can no longer be shared across endpoints — acceptable since the only consumers were the live endpoints themselves.
+
+**Reversibility:**
+
+Phase 1 is fully reversible — delete NAT resources, switch backend back to public subnets (or keep in private if that's fine; backend doesn't need internet without the live endpoints).
+
+Phase 2 is reversible by re-merging the live router into the main backend and re-adding NAT. The cost of reversal is mostly code-move work; Terraform state changes are straightforward.
+
+### Impact on project plan / docs
+
+- **Update ADR-005 cross-reference:** ADR-005's "no NAT" stance was correct under its scope (ingestion). The runtime live-data path introduced by ADR-007 falls outside that scope and motivates Phase 1 here. No edit to ADR-005 — its decision remains valid for its stated context.
+- **Update ADR-007 watch points:** add a note that runtime upstream dependency on the request path now also requires outbound network configuration, addressed by ADR-008.
+- **Story 7.x (CI/CD):** when Phase 2 lands, the backend CI workflow (Story 7.3) needs a sibling workflow for `backend_live`. Defer until Phase 2 is scheduled.
+- **PENDING_FEATURES.md:** add an entry pointing to ADR-008 Phase 2 as a planned cost-optimization migration (out of scope this iteration).
+
+---
+
+## ADR-009 — Playoff data storage: unified tables with `game_type` discriminator vs. fully separate playoff tables
+
+**Date:** Post-Epic 7 / Playoff season 2025-26  
+**Status:** Proposed
+
+### Context
+
+The 2025-26 playoffs are in progress. NBAJinni currently stores and serves regular-season data only: `games`, `player_game_stats`, `team_game_stats`, `player_season_averages`, and `team_season_averages` all assume a single regular-season population per season. Playoff games use the same NBA game ID format (prefix `004` vs. regular season `002`) and the same box-score schema, but they are a distinct competitive context — a player's playoff averages and regular season averages are two different products displayed in different places, and a playoff game carries different meaning than a regular season game.
+
+Two competing needs drive this decision:
+
+1. **Seamless integration** — widgets and list views should surface both game types naturally. The GamesWidget (`/games/live/today`) uses the live NBA API and is unaffected by DB schema, but team schedule pages (`/teams/{id}/games`), upcoming game listings (`/games/upcoming`), head-to-head history (`/games/h2h`), and game detail (`/games/{game_id}`) all query the `games` table by ID or by team. These views should work without callers having to know or route by game type.
+
+2. **Explicit distinction** — player profile pages need to display regular season averages and playoff averages as separate, labeled numbers. Game pages need playoff context (round, series game number). Season-average comparisons in prediction widgets must not accidentally pool regular season and playoff performance.
+
+Two principal storage strategies were considered.
+
+---
+
+### Option A — Fully separate playoff tables
+
+Introduce five new tables: `playoff_games`, `playoff_player_game_stats`, `playoff_team_game_stats`, `playoff_player_averages`, `playoff_team_averages`. Each mirrors the schema of its regular-season counterpart but lives in its own namespace.
+
+**Pros:**
+
+- Clean isolation: regular season data is never touched by playoff writes; schema evolution can diverge independently if needed (e.g., playoff-specific fields like `series_game_number`, `series_record` without backfilling regular season rows).
+- No migration on populated tables — the new tables are purely additive.
+- No `game_type` filter to remember on existing queries: regular season queries are unchanged.
+
+**Cons:**
+
+- **Game ID routing problem.** `GET /games/{game_id}` currently does a single `SELECT ... WHERE Game.id = game_id`. With two tables, the handler must either: (a) route by ID prefix (brittle — depends on NBA's internal `002`/`004` convention staying stable), or (b) query both tables and return whichever hits (two queries per request, or a UNION). Every endpoint that resolves by game ID inherits this complexity.
+- **UNION queries on all list views.** Team schedule, upcoming games, and h2h all query `games` by date range or team ID. To include playoff games, every one of these queries becomes a UNION across two tables — or the backend gains a routing layer that decides which table(s) to query per call. This directly contradicts the seamless integration requirement.
+- **`player_game_stats.game_id` FK breaks.** This column is a foreign key to `games.id`. Playoff player stats in a separate table would either point to `playoff_games.id` (requiring a schema change to the stats model) or have no relational integrity anchor. All existing relationships defined on `PlayerGameStat` would need a parallel set on `PlayoffPlayerGameStat`.
+- **Duplicated loader logic.** The loader currently truncates and inserts in a defined FK-safe ordering. Adding five new tables doubles the game-related table count and requires a parallel truncation/insertion path with its own ordering. The S3 export must also track five additional files.
+- **A game is a game.** A Lakers/Thunder playoff game has the same fields as a regular season game. Separate tables treat a contextual attribute (game type) as a structural difference — a design pattern that produces the UNION proliferation problem over time.
+
+---
+
+### Option B — Unified tables with a `game_type` discriminator column
+
+Add a `game_type` column (`"regular"` | `"playoff"`) to `games`, `player_game_stats`, and `team_game_stats`. For the aggregated averages tables (`player_season_averages`, `team_season_averages`), promote `game_type` into the composite primary key, yielding one row per `(player_id, season, game_type)` pair.
+
+**Pros:**
+
+- **Game ID lookup remains a single query.** `GET /games/{game_id}` requires zero routing changes. All endpoints that resolve by ID — game detail, live per-game fallback, player box scores — are unaffected.
+- **List views remain single queries.** Team schedule, upcoming games, and h2h continue to query a single `games` table. Playoff games appear naturally in team schedules. Filtering to one type is `WHERE game_type = 'regular'` — one predicate, not a UNION.
+- **FK integrity is preserved end-to-end.** `player_game_stats.game_id` still references `games.id` regardless of game type. All existing SQLAlchemy relationships on `Game`, `PlayerGameStat`, and `TeamGameStat` are unchanged.
+- **Averages distinction is explicit and ergonomic.** `(player_id, season, "regular")` and `(player_id, season, "playoff")` are two rows in the same table. A player profile can fetch both in one query and display them side-by-side, or scope to one type with a single `WHERE game_type = ?`.
+- **Loader impact is minimal.** The truncate+insert export/import pipeline adds one column to three existing exports. No new table ordering or dependency graph changes.
+
+**Cons:**
+
+- **Schema migration required on populated tables.** `games`, `player_game_stats`, and `team_game_stats` are already populated. Adding `game_type` requires the multi-step Alembic pattern from `SCHEMA_AMENDMENTS.md`: add as nullable, backfill `"regular"` on all existing rows, add `NOT NULL` constraint. Three migrations, each safe and fast given current row counts.
+- **`player_season_averages` and `team_season_averages` PK change.** Current PK is `(season, player_id)`. Promoting `game_type` into the PK is a destructive migration: the existing constraint must be dropped and a new composite PK `(season, player_id, game_type)` created. Both tables have at most ~500 rows total so the migration runs in milliseconds, but the step requires care and follows the SCHEMA_AMENDMENTS.md choreography.
+- **All existing queries become latent correctness risks.** Code that does not filter by `game_type` will return both regular season and playoff games after playoff data is loaded. Every endpoint that touches `games` must be audited and updated to either filter explicitly or document intentional inclusion of both types. This is a one-time but non-trivial audit.
+- **`game_type` on stats tables is a denormalized column.** It can always be derived by joining `games`, but storing it on `player_game_stats` and `team_game_stats` avoids the join on hot query paths. This mirrors the existing `season` denormalization on those tables and is intentional, but the invariant (stats `game_type` matches parent game's `game_type`) is enforced by the ingestion layer, not a DB constraint.
+
+---
+
+### Decision
+
+Option B — unified tables with `game_type` discriminator — is the recommended approach.
+
+The decisive argument against Option A is the game ID routing problem compounding across the entire API surface. Every endpoint is built around `game_id` as the single opaque identifier; no existing handler branches on game type to determine which table to query. Splitting games into two tables would propagate UNION queries and routing logic into team schedules, upcoming games, h2h history, and game detail — all of which currently work with a single, clean query. That cost compounds with every new endpoint.
+
+The migration cost of Option B is real but bounded. The `SCHEMA_AMENDMENTS.md` backfill pattern is already established, the column additions on game-related tables are standard, and the PK change on averages tables runs on tables of at most 500 rows. The query audit is the largest non-schema effort, but it is a one-time pass and failures surface visibly in testing (mixed data in views that should be type-scoped).
+
+### Implementation scope (ingestion and DB — frontend deferred)
+
+**Schema changes (Alembic migrations, in order):**
+
+1. `games` — add `game_type VARCHAR NOT NULL DEFAULT 'regular'`; backfill; drop default.
+2. `player_game_stats` — same column addition.
+3. `team_game_stats` — same column addition.
+4. `player_season_averages` — drop PK `(season, player_id)` and `UniqueConstraint("player_id", "season")`; add PK and `UniqueConstraint` on `(season, player_id, game_type)`.
+5. `team_season_averages` — same PK change.
+
+Each `game_type` column addition must follow the SCHEMA_AMENDMENTS.md multi-step pattern. Migrations 4 and 5 are destructive PK changes and must run after 1–3 are fully applied and the backfill is confirmed.
+
+**Ingestion changes:**
+
+- Playoff game ingestion mirrors `run_nightly()` but invokes `nba_api` endpoints with `season_type_all_star="Playoffs"` and writes `game_type="playoff"` on all inserted rows across `games`, `player_game_stats`, and `team_game_stats`.
+- Playoff averages aggregation runs against `WHERE game_type = 'playoff'` and inserts into `player_season_averages` and `team_season_averages` with `game_type="playoff"`. The existing regular season aggregation job is unchanged.
+
+**Loader changes:**
+
+- `export_to_json.py`: include `game_type` in the column list for `games`, `player_game_stats`, `team_game_stats`, and treat it as part of the composite key for averages exports.
+- No new table ordering required.
+
+**Backend query audit (scoped to a dedicated story):**
+
+Every endpoint touching `games`, `player_game_stats`, or `team_game_stats` must be reviewed. Expected determinations:
+
+| Endpoint | `game_type` treatment |
+|---|---|
+| `GET /games/upcoming` | Include both — intentional |
+| `GET /teams/{id}/games` | Include both — intentional |
+| `GET /games/h2h` | Include both — intentional |
+| `GET /games/{game_id}` | No filter needed — ID is unique |
+| `GET /players/{id}/season-averages` | Filter `game_type = 'regular'`; playoff averages via new endpoint or `?type=` param |
+| `GET /players/{id}/last-5-games` | Include both by default; `?type=` param to scope |
+| `GET /standings` | Regular season only — standings not computed for playoffs |
+| `GET /games/live/today` | NBA live API, no DB query — unaffected |
+
+### Consequences
+
+**Positive:**
+
+- All existing endpoints continue to work without routing changes after the migration and audit.
+- Playoff games appear naturally in team schedule and upcoming game views once data is loaded.
+- Player and team averages distinguish regular season from playoff with a single table, one predicate.
+- Loader and export pipeline require column additions only — no new table management.
+
+**Negative / Watch points:**
+
+- Multi-step migration on live tables must be sequenced per `SCHEMA_AMENDMENTS.md`. The PK change on averages tables is the most operationally sensitive step.
+- The query audit is a mandatory prerequisite before loading playoff data — loading without it will contaminate views that implicitly assume regular season.
+- `game_type` on stats tables is a denormalized invariant enforced by ingestion, not the DB. A bug in the ingestion layer that writes the wrong `game_type` on stats rows would produce subtle data errors rather than constraint violations. The ingestion tests must cover this.
+- Frontend work for playoff-specific display (series context on game pages, playoff averages tab on player profiles, prediction widget differentiation) is out of scope for this ADR and must be planned as a subsequent epic.
+
+### Impact on project plan
+
+- **New story: Playoff schema migrations** — five Alembic steps per SCHEMA_AMENDMENTS.md; gating for all subsequent playoff work.
+- **New story: Playoff ingestion job** — `run_playoff()` in ingestion pipeline; playoff averages aggregation; loader export column additions.
+- **New story: Backend query audit** — review and update all endpoints that touch game-related tables; add `game_type` filters where required; confirm intentional inclusions.
+- **Deferred: Frontend playoff display** — game pages (round/series context), player profile playoff averages tab, prediction widget differentiation. Depends on the three stories above.
+- **`PENDING_FEATURES.md`:** add entry for playoff series metadata (`series_game_number`, `series_record`, `round`) — available from `nba_api`, enriches game pages, deferred from the core ingestion story.
+
+---
+
+## ADR-010 — CI authentication via GitHub OIDC with environment-scoped IAM roles
+
+**Date:** Epic 7 / 2026-05
+**Status:** Accepted
+
+### Context
+
+Epic 7 adds a GitHub Actions CI/CD pipeline. Before any workflow can deploy to AWS, it must authenticate. The naive approach — long-lived `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` stored as GitHub repository secrets — poses unacceptable risks: keys are static, can be leaked through log output or a compromised fork, have no expiry enforcement, and are account-wide blunt instruments with no per-environment isolation.
+
+Multiple gate points are required:
+
+- **Per-environment permission isolation:** dev workflows must not be able to touch prod resources.
+- **Manual approval for prod:** even in a solo project, an explicit confirmation step is valuable for production deploys.
+- **Audit trail:** who approved a prod deploy, when, and from which commit.
+- **No secret sprawl:** the number of long-lived credentials stored anywhere should be zero.
+
+### Decision
+
+Use **OpenID Connect (OIDC) federation** between GitHub Actions and AWS. GitHub mints a short-lived, signed JWT per workflow run. AWS verifies the signature via a registered OIDC Identity Provider and exchanges the token for temporary STS credentials scoped to a specific IAM role.
+
+Key specifics:
+
+- One `aws_iam_openid_connect_provider` resource, created account-wide (singleton). URL: `https://token.actions.githubusercontent.com`. Audience: `sts.amazonaws.com`. Thumbprints computed dynamically via the `hashicorp/tls` provider's `tls_certificate` data source — this defends against GitHub certificate rotation without manual thumbprint management.
+- Two IAM roles: `nbajinni-dev-github-actions-role` and `nbajinni-prod-github-actions-role`. Each has an OIDC trust policy with a `StringEquals` condition on both the `aud` and `sub` claims. The `sub` claim format is: `repo:cuhhleed/nba-jinni:environment:<env>`. This means **a workflow MUST declare `environment: <env>` in its job block** to match the trust policy and assume the role. A workflow without an `environment:` declaration cannot assume either role — this is an intentional hard gate.
+- Two **GitHub Environments** (`dev`, `prod`) managed in Terraform via the `integrations/github` provider. The `dev` environment has no approval requirement (fast iteration). The `prod` environment requires manual approval from `cuhhleed` before a job using it runs, and is restricted to protected branches only.
+- `AWS_ROLE_ARN` and `AWS_REGION` are stored as **environment-scoped** GitHub Actions secrets — not repository-level secrets. A workflow using `environment: dev` can only read the dev secrets; a workflow using `environment: prod` is blocked at the approval step before secrets are exposed.
+- All infrastructure (OIDC provider, IAM roles, policies, GitHub environments, secrets) is managed in `infra/environments/shared/` with its own Terraform state file (`environments/shared/terraform.tfstate` in the same S3 backend). This env is "account-wide CI bootstrap" — not tied to any application environment's lifecycle.
+
+### Consequences
+
+**Positive:**
+
+- No long-lived AWS credentials exist anywhere. Every deploy uses a token valid for at most one hour.
+- Per-environment IAM blast radius: even if a dev workflow is compromised, it cannot touch prod IAM roles, prod secrets, or prod infrastructure.
+- GitHub's native deployment history UI tracks every environment deploy with committer, timestamp, and approval.
+- The `sub` claim gate provides defense-in-depth: a maliciously crafted workflow file cannot assume a role unless the job declares an `environment:` that matches the trust policy — and prod requires human approval before that environment's token is issued.
+- Thumbprint management is automated: `tls_certificate` data source fetches the current cert chain at plan time, so GitHub cert rotation does not require manual Terraform updates.
+
+**Negative / Watch points:**
+
+- `infra/environments/shared/` requires a fine-grained GitHub PAT (`Administration: write`, `Secrets: write`, `Environments: write`) to be present as `GITHUB_TOKEN` at apply time. This PAT is not stored in CI — applies on the shared env are run locally. The PAT has an expiry; rotation is a manual step (see `infra/environments/shared/README.md`).
+- Coupling to the `integrations/github` Terraform provider means GitHub API rate limits and provider version upgrades are an ongoing maintenance concern.
+- Every subsequent deploy workflow (Stories 7.2–7.5) **must** declare `environment: dev` or `environment: prod` in each job block. Omitting `environment:` causes the assume-role step to fail with `Not authorized to perform sts:AssumeRoleWithWebIdentity`. This is correct behavior but requires discipline in workflow authorship.
+
+### Alternatives Considered
+
+- **Long-lived access keys as repository secrets:** simplest to implement but worst security posture. Keys never expire unless rotated manually, are visible to all repository collaborators, and grant the same permissions regardless of which branch or environment triggered the workflow. Rejected.
+- **Single OIDC role with branch-scoped trust (`ref:refs/heads/main`):** simpler trust policy (one role, not two), but loses environment-scoped secret isolation and the deployment-history / approval UI. The discriminator is branch name, which is fragile if the branching strategy changes. Rejected in favor of per-env roles scoped by GitHub Environment.
+- **Separate AWS accounts per env (Control Tower / Organizations):** strongest possible blast-radius isolation. Overkill for a solo project at current scale. Revisit if the project grows to a team or adds regulatory requirements.
+- **Per-job hardcoded role ARN inputs (no GitHub env secrets):** defeats the purpose of env-scoped secrets — role ARNs would be visible in plaintext in workflow YAML committed to the repo. Rejected.
+
+### Notes on permissions scoping
+
+The deploy policy (`github_oidc_deploy_policy.json.tpl`) grants the minimum set needed for the stories in Epic 7:
+
+| Permission group | Actions | Resource scope |
+|---|---|---|
+| Lambda code update | `UpdateFunctionCode`, `GetFunction`, `InvokeFunction` | `arn:aws:lambda:*:*:function:nbajinni-<env>-*` |
+| S3 deploy/sync | `PutObject`, `GetObject`, `DeleteObject`, `ListBucket`, `GetBucketLocation` | The three named buckets (`frontend`, `data-exports`, `lambda-artifacts`) — exact names, no wildcard on bucket name |
+| CloudFront invalidation | `CreateInvalidation`, `GetInvalidation`, `GetDistribution`, `ListDistributions` | `*` — CloudFront ARNs are random hex; resource-level restriction is not practical |
+| Secrets Manager read | `GetSecretValue`, `DescribeSecret` | `arn:aws:secretsmanager:*:*:secret:nbajinni/<env>/*` |
+| RDS describe | `DescribeDBInstances` | `*` — describe APIs don't support resource-level restrictions |
+| CloudWatch Logs read | `DescribeLogGroups`, `DescribeLogStreams`, `GetLogEvents`, `FilterLogEvents` | `/aws/lambda/nbajinni-<env>-*` log groups only |
+
+**`lambda:UpdateFunctionConfiguration` is explicitly excluded.** Environment variables and VPC configuration are owned by Terraform. Allowing CI to write function configuration would create a drift vector where CI changes override Terraform state without being recorded. Configuration changes must go through `terraform apply`.
+
+**`logs:*` write actions are excluded.** CI has no reason to create or delete log groups. Read-only access is sufficient for deploy debugging (tailing logs after a deploy to confirm the new code is healthy).

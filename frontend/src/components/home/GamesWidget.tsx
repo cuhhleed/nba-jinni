@@ -6,7 +6,7 @@ import ErrorState from "../ui/ErrorState";
 import LoadingState from "../ui/LoadingState";
 import GameCarpetBadge from "./GameCarpetBadge";
 
-const GAP_PX = 12; // matches gap-3 (0.75rem @ 16px base)
+const GAP_PX = 32; // matches gap-8 (2rem @ 16px base)
 const AUTO_ADVANCE_MS = 7000;
 
 export default function GamesWidget() {
@@ -28,14 +28,41 @@ export default function GamesWidget() {
     const vp = viewportRef.current;
     const tr = trackRef.current;
     if (!vp || !tr) return;
+    const firstCard = tr.firstElementChild as HTMLElement | null;
+    if (!firstCard) return;
+
+    const trackStyle = getComputedStyle(tr);
+    const padLeft = parseFloat(trackStyle.paddingLeft) || 0;
+    const padRight = parseFloat(trackStyle.paddingRight) || 0;
+    const gap = parseFloat(trackStyle.columnGap) || GAP_PX;
+
     const vw = vp.offsetWidth;
-    const tw = tr.scrollWidth;
-    if (tw <= vw) return;
-    const totalPages = Math.ceil(tw / (vw + GAP_PX));
+    const trackContent = vw - padLeft - padRight;
+    const cardOuter = firstCard.offsetWidth;
+    if (cardOuter <= 0) return;
+
+    const cardsPerPage = Math.max(
+      1,
+      Math.round((trackContent + gap) / (cardOuter + gap)),
+    );
+    const totalCards = tr.children.length;
+    if (totalCards <= cardsPerPage) {
+      tr.style.transform = "translateX(0px)";
+      pageIndexRef.current = 0;
+      setPageIndex(0);
+      return;
+    }
+
+    const totalPages = Math.ceil(totalCards / cardsPerPage);
+    const stride = trackContent + gap;
+    const maxTranslate = Math.max(0, tr.scrollWidth - vw);
+
     const idx = ((rawIndex % totalPages) + totalPages) % totalPages;
     pageIndexRef.current = idx;
     setPageIndex(idx);
-    tr.style.transform = `translateX(-${idx * (vw + GAP_PX)}px)`;
+
+    const translate = Math.min(idx * stride, maxTranslate);
+    tr.style.transform = `translateX(-${translate}px)`;
   }, []);
 
   useEffect(() => {
@@ -97,7 +124,7 @@ export default function GamesWidget() {
         {!isLoading && !hasError && games.length > 0 && (
           <div
             ref={trackRef}
-            className="flex gap-3 px-2 transition-transform duration-300 ease-in-out"
+            className="flex gap-8 px-4 transition-transform duration-300 ease-in-out"
           >
             {games.map((entry) => (
               <GameCarpetBadge

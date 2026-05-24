@@ -52,8 +52,27 @@ variable "memory_size" {
 }
 
 variable "filename" {
-  description = "Path to the function's deployment package within the local filesystem."
+  description = "Path to the function's deployment package within the local filesystem. Set this OR s3_bucket/s3_key."
   type        = string
+  default     = null
+}
+
+variable "s3_bucket" {
+  description = "S3 bucket containing the deployment package. Set this OR filename."
+  type        = string
+  default     = null
+}
+
+variable "s3_key" {
+  description = "S3 key of the deployment package."
+  type        = string
+  default     = null
+}
+
+variable "s3_object_version" {
+  description = "S3 object version of the deployment package."
+  type        = string
+  default     = null
 }
 
 variable "replacement_security_group_ids" {

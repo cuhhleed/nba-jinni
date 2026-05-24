@@ -489,11 +489,11 @@ _As a developer, I want GitHub Actions to authenticate with AWS without storing 
 
 Tasks:
 
-- [ ] Create an OIDC identity provider in AWS IAM for GitHub Actions
-- [ ] Create separate IAM roles for `dev` and `prod`, with trust policies scoped to this repository and (for prod) the `main` ref
-- [ ] Role permissions: `lambda:UpdateFunctionCode`, `lambda:UpdateFunctionConfiguration`, `lambda:InvokeFunction`, S3 sync (frontend + loader-input buckets), CloudFront invalidation, `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`, `rds:DescribeDBInstances`, `logs:*`
-- [ ] Add `AWS_ROLE_ARN_DEV` and `AWS_ROLE_ARN_PROD` as GitHub Actions secrets
-- [ ] Verify OIDC auth works against each env with a no-op test workflow
+- [x] Create an OIDC identity provider in AWS IAM for GitHub Actions
+- [x] Create separate IAM roles for `dev` and `prod`, with trust policies scoped to this repository and environment
+- [x] Role permissions: `lambda:UpdateFunctionCode`, `lambda:GetFunction`, `lambda:InvokeFunction`, S3 sync (frontend + data-exports + lambda-artifacts buckets), CloudFront invalidation, `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`, `rds:DescribeDBInstances`, CloudWatch Logs read-only (see ADR-010 for exclusions)
+- [x] Add AWS_ROLE_ARN and AWS_REGION as environment-scoped secrets on the dev and prod GitHub Environments
+- [x] Verify OIDC auth works against each env with a no-op test workflow
 
 ---
 
