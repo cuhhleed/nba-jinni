@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, computed_field, model_validator
 from datetime import date, datetime
 from typing import Annotated, Literal, Optional, Union
-from pydantic import Field
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class GameBase(BaseModel):
@@ -20,12 +20,14 @@ class GameBase(BaseModel):
 
 def _split_team_stats(data: object) -> object:
     """
-    Converts an ORM Game instance into a plain dict with home_team_stat / away_team_stat
-    scalars split out of the Game.team_stats list. Called by model_validators on GameResult
-    and GameWithTeamStats so the splitting logic lives in one place.
+    Converts an ORM Game instance into a plain dict with home_team_stat /
+    away_team_stat scalars split out of the Game.team_stats list. Called by
+    model_validators on GameResult and GameWithTeamStats so the splitting
+    logic lives in one place.
 
-    home_team / away_team are passed through untouched — only included when the handler
-    has eager-loaded them (GameResult needs them for standing; GameWithTeamStats does not).
+    home_team / away_team are passed through untouched — only included when
+    the handler has eager-loaded them (GameResult needs them for standing;
+    GameWithTeamStats does not).
     """
     if not hasattr(data, "team_stats"):
         return data
@@ -119,8 +121,9 @@ class TeamScheduleResponse(BaseModel):
 
 
 # Discriminated union for GET /games/{id}.
-# Uses the computed `kind` field (Literal["preview"] | Literal["result"]) as the
-# discriminator rather than the raw int `status`, since Pydantic requires string literals.
+# Uses the computed `kind` field (Literal["preview"] | Literal["result"]) as
+# the discriminator rather than the raw int `status`, since Pydantic requires
+# string literals.
 GameDetailResponse = Annotated[
     Union[GamePreview, GameResult],
     Field(discriminator="kind"),
@@ -183,7 +186,7 @@ class LiveScoreboardResponse(BaseModel):
     is_stale: bool
 
 
-from .team import TeamWithSeasonAverage, TeamWithStandingAndAverage, TeamWithStanding
+from .team import TeamWithSeasonAverage, TeamWithStanding, TeamWithStandingAndAverage
 from .team_game_stat import TeamGameStatBase
 
 GameWithTeams.model_rebuild()

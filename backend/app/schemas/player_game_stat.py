@@ -1,5 +1,6 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import date
+
+from pydantic import BaseModel, ConfigDict
 
 
 class PlayerGameStatBase(BaseModel):
@@ -33,7 +34,8 @@ class PlayerGameStatBase(BaseModel):
 
 
 class PlayerGameStatWithName(PlayerGameStatBase):
-    """Used by GET /games/{id}/playerstats — includes player name for the box score UI."""
+    """Used by GET /games/{id}/playerstats — includes player name for the
+    box score UI."""
 
     first_name: str
     last_name: str

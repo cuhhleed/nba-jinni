@@ -6,10 +6,12 @@ Happy-path tests for game endpoints:
   GET /games/live/today         — bulk live scoreboard
   GET /games/live/{game_id}     — per-game live box score
 """
+
 import time
-import pytest
 from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -30,9 +32,7 @@ async def test_get_game_result(
 
 
 @pytest.mark.asyncio
-async def test_get_game_result_missing_stats_returns_409(
-    client, test_game
-):
+async def test_get_game_result_missing_stats_returns_409(client, test_game):
     """Completed game with no team_stats rows → 409."""
     response = await client.get(f"/games/{test_game.id}")
     assert response.status_code == 409
@@ -64,9 +64,7 @@ async def test_get_game_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_get_game_player_stats(
-    client, test_game, test_player_game_stat
-):
+async def test_get_game_player_stats(client, test_game, test_player_game_stat):
     response = await client.get(f"/games/{test_game.id}/playerstats")
     assert response.status_code == 200
     data = response.json()
@@ -128,7 +126,8 @@ async def test_get_h2h_symmetric(
     return the same game. A second game with reversed home/away also appears in both
     orderings.
     """
-    from datetime import date, datetime, timezone
+    from datetime import date, datetime
+
     from nbajinni_shared.models.games import Game
 
     # Add a reversed fixture — BOS home, LAL away — in the same season
@@ -168,12 +167,17 @@ async def test_get_h2h_symmetric(
 # Helpers for live endpoint tests
 # ---------------------------------------------------------------------------
 
+
 def _make_scoreboard_mock(game_status: int = 2) -> MagicMock:
     """Build a ScoreBoard mock whose .games.get_dict() returns one game entry."""
     game_entry = {
         "gameId": "0022300001",
         "gameStatus": game_status,
-        "gameStatusText": "Q3 5:30" if game_status == 2 else "Final" if game_status == 3 else "7:30 pm ET",
+        "gameStatusText": (
+            "Q3 5:30"
+            if game_status == 2
+            else "Final" if game_status == 3 else "7:30 pm ET"
+        ),
         "gameTimeUTC": "2024-10-01T23:30:00Z",
         "period": 3 if game_status == 2 else 4 if game_status == 3 else 0,
         "gameClock": "PT05M30.00S" if game_status == 2 else "",
@@ -225,9 +229,13 @@ def _make_boxscore_mock(game_id: str, game_status: int = 2) -> MagicMock:
     away_team_obj = MagicMock()
     away_team_obj.get_dict.return_value = {"score": 82}
     home_players_obj = MagicMock()
-    home_players_obj.get_dict.return_value = [_make_player_entry(2544, "LeBron", "James")]
+    home_players_obj.get_dict.return_value = [
+        _make_player_entry(2544, "LeBron", "James")
+    ]
     away_players_obj = MagicMock()
-    away_players_obj.get_dict.return_value = [_make_player_entry(1629029, "Jayson", "Tatum")]
+    away_players_obj.get_dict.return_value = [
+        _make_player_entry(1629029, "Jayson", "Tatum")
+    ]
 
     mock = MagicMock()
     mock.game = game_obj
@@ -241,6 +249,7 @@ def _make_boxscore_mock(game_id: str, game_status: int = 2) -> MagicMock:
 # ---------------------------------------------------------------------------
 # Bulk live scoreboard: GET /games/live/today
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_live_scoreboard_cache_miss_success(client):
@@ -288,7 +297,9 @@ async def test_live_scoreboard_stale_fallback(client):
         value, _, last_updated_at = _live_cache._store[key]
         _live_cache._store[key] = (value, time.time() - 1, last_updated_at)
 
-    with patch("app.routers.games.ScoreBoard", side_effect=RuntimeError("upstream down")):
+    with patch(
+        "app.routers.games.ScoreBoard", side_effect=RuntimeError("upstream down")
+    ):
         response = await client.get("/games/live/today")
 
     assert response.status_code == 200
@@ -298,7 +309,9 @@ async def test_live_scoreboard_stale_fallback(client):
 @pytest.mark.asyncio
 async def test_live_scoreboard_no_cache_upstream_failure(client):
     """No cache + upstream failure → 503."""
-    with patch("app.routers.games.ScoreBoard", side_effect=RuntimeError("upstream down")):
+    with patch(
+        "app.routers.games.ScoreBoard", side_effect=RuntimeError("upstream down")
+    ):
         response = await client.get("/games/live/today")
 
     assert response.status_code == 503
@@ -307,6 +320,7 @@ async def test_live_scoreboard_no_cache_upstream_failure(client):
 # ---------------------------------------------------------------------------
 # Per-game live endpoint: GET /games/live/{game_id}
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_live_game_final_returns_409(client, test_game):

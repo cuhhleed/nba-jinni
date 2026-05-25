@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
 from typing import TYPE_CHECKING
+
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from .player import PlayerBase
@@ -41,6 +42,6 @@ class PlayerSeasonAverageWithPlayer(PlayerSeasonAverageBase):
     player: "PlayerBase"
 
 
-from .player import PlayerBase
+from .player import PlayerBase  # noqa: F811
 
 PlayerSeasonAverageWithPlayer.model_rebuild()

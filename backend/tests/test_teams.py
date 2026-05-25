@@ -1,6 +1,7 @@
 """
 Happy-path tests for GET /teams/{team_id}/games.
 """
+
 import pytest
 
 

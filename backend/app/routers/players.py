@@ -1,17 +1,22 @@
 from datetime import date as date_type
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy import select, func
 
+from fastapi import APIRouter, Depends, HTTPException, Query
 from nbajinni_shared.logging import configure_logging, get_logger
-from nbajinni_shared.models.players import Player
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
-from ..dependencies import get_db, get_current_season
-from ..schemas.player import PlayerDetail, PlayerBase
-from ..schemas.player_game_stat import PlayerGameStatBase, PlayerGameStatWithContext, RecentPerformance
+from nbajinni_shared.models.players import Player
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from ..dependencies import get_current_season, get_db
+from ..schemas.player import PlayerBase, PlayerDetail
+from ..schemas.player_game_stat import (
+    PlayerGameStatBase,
+    PlayerGameStatWithContext,
+    RecentPerformance,
+)
 from ..schemas.player_season_average import (
     PlayerSeasonAverageBase,
     PlayerSeasonAverageWithPlayer,
@@ -47,7 +52,7 @@ async def get_player_search(
 
 
 @router.get("/players", response_model=list[PlayerBase])
-async def get_player_search(db: AsyncSession = Depends(get_db)):
+async def get_all_players(db: AsyncSession = Depends(get_db)):
 
     stmt = select(Player).where(Player.team_id != 0)
 
@@ -118,7 +123,8 @@ async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
 )
 async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
     """
-    Returns up to 3 standout individual performances from the last two ingested game-days.
+    Returns up to 3 standout individual performances from the last two ingested
+    game-days.
 
     Recency is defined relative to the most-recent game_date that has player_game_stats
     rows — not by calendar offset from now — so UTC/ET drift on west-coast games does
@@ -148,7 +154,13 @@ async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
     recent_dates = list(recent_date_rows)
 
     stmt = (
-        select(PlayerGameStat, Game.game_date, Player.first_name, Player.last_name, Player.team_id)
+        select(
+            PlayerGameStat,
+            Game.game_date,
+            Player.first_name,
+            Player.last_name,
+            Player.team_id,
+        )
         .join(Game, PlayerGameStat.game_id == Game.id)
         .join(Player, PlayerGameStat.player_id == Player.id)
         .where(Game.game_date.in_(recent_dates))
