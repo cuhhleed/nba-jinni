@@ -34,7 +34,8 @@ class StaleCache(Generic[T]):
         return None
 
     def get_stale(self, key: str) -> tuple[T, float] | None:
-        """Return (value, last_updated_at) regardless of expiry, or None if never set."""
+        """Return (value, last_updated_at) regardless of expiry,
+        or None if never set."""
         with self._lock:
             entry = self._store.get(key)
         if entry is None:

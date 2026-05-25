@@ -8,37 +8,36 @@ wires a FastAPI httpx.AsyncClient that overrides get_db to use the test session.
 All fixtures are function-scoped; the session rolls back after each test so tests
 are fully isolated.
 """
-import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy import text
-from datetime import date, datetime
-import os
-from dotenv import load_dotenv
 
-from nbajinni_shared.models.teams import Team
-from nbajinni_shared.models.players import Player
+import os
+from datetime import date, datetime
+
+import pytest
+import pytest_asyncio
+from dotenv import load_dotenv
+from httpx import ASGITransport, AsyncClient
 from nbajinni_shared.models.games import Game
+from nbajinni_shared.models.player_game_stats import PlayerGameStat
+from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
+from nbajinni_shared.models.players import Player
 from nbajinni_shared.models.seasons import Season
 from nbajinni_shared.models.standings import Standing
-from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.team_game_stats import TeamGameStat
-from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
+from nbajinni_shared.models.teams import Team
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from app.main import app
 from app.dependencies import get_db
+from app.main import app
 from app.routers.games import _live_cache
 
 load_dotenv()
 
 
-import pytest
-
-
 @pytest.fixture(autouse=True)
 def reset_live_cache():
-    """Clear the module-level StaleCache before each test to prevent cross-test pollution."""
+    """Clear the module-level StaleCache before each test to prevent
+    cross-test pollution."""
     _live_cache.clear()
 
 
@@ -46,9 +45,12 @@ def reset_live_cache():
 # Engine / session infrastructure
 # ---------------------------------------------------------------------------
 
+
 @pytest_asyncio.fixture
 async def engine():
-    engine = create_async_engine(os.getenv("TEST_DATABASE_URL"), pool_size=1, max_overflow=0)
+    engine = create_async_engine(
+        os.getenv("TEST_DATABASE_URL"), pool_size=1, max_overflow=0
+    )
     yield engine
     await engine.dispose()
 
@@ -69,11 +71,14 @@ async def session(engine):
 @pytest_asyncio.fixture
 async def client(session):
     """FastAPI AsyncClient wired to the test session via dependency_overrides."""
+
     async def override_get_db():
         yield session
 
     app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -82,6 +87,7 @@ async def client(session):
 # Data fixtures — mirrors shared/tests/conftest.py patterns exactly.
 # No defaults; every field is explicit.
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def test_season(session):
@@ -93,7 +99,13 @@ async def test_season(session):
 
 @pytest_asyncio.fixture
 async def test_home_team(session):
-    team = Team(id=1610612747, name="Los Angeles Lakers", nickname="Lakers", code="LAL", conference="West")
+    team = Team(
+        id=1610612747,
+        name="Los Angeles Lakers",
+        nickname="Lakers",
+        code="LAL",
+        conference="West",
+    )
     session.add(team)
     await session.flush()
     return team
@@ -101,7 +113,13 @@ async def test_home_team(session):
 
 @pytest_asyncio.fixture
 async def test_away_team(session):
-    team = Team(id=1610612738, name="Boston Celtics", nickname="Celtics", code="BOS", conference="East")
+    team = Team(
+        id=1610612738,
+        name="Boston Celtics",
+        nickname="Celtics",
+        code="BOS",
+        conference="East",
+    )
     session.add(team)
     await session.flush()
     return team
@@ -109,7 +127,9 @@ async def test_away_team(session):
 
 @pytest_asyncio.fixture
 async def test_player(session, test_home_team):
-    player = Player(id=2544, first_name="LeBron", last_name="James", team_id=test_home_team.id)
+    player = Player(
+        id=2544, first_name="LeBron", last_name="James", team_id=test_home_team.id
+    )
     session.add(player)
     await session.flush()
     return player
@@ -244,7 +264,9 @@ async def test_away_team_game_stat(session, test_season, test_game, test_away_te
 
 
 @pytest_asyncio.fixture
-async def test_player_game_stat(session, test_season, test_game, test_player, test_home_team):
+async def test_player_game_stat(
+    session, test_season, test_game, test_player, test_home_team
+):
     stat = PlayerGameStat(
         game_id=test_game.id,
         player_id=test_player.id,

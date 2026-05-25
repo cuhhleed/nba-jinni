@@ -1,5 +1,7 @@
-from pydantic import BaseModel, ConfigDict
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+
 
 class TeamBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -11,6 +13,7 @@ class TeamBase(BaseModel):
     conference: Optional[str]
     logo: Optional[str]
 
+
 class TeamWithRoster(TeamBase):
     players: list["PlayerBase"]
 
@@ -19,12 +22,15 @@ class TeamDetail(TeamBase):
     standing: "StandingBase"
     season_averages: list["TeamSeasonAverageBase"]
 
+
 class TeamWithSeasonAverage(TeamBase):
     season_averages: list["TeamSeasonAverageBase"]
+
 
 class TeamWithGames(TeamBase):
     home_games: list["GameBase"]
     away_games: list["GameBase"]
+
 
 class TeamWithStandingAndAverage(TeamBase):
     # Used in GamePreview: exposes team identity, current-season standing, and
@@ -32,19 +38,22 @@ class TeamWithStandingAndAverage(TeamBase):
     standing: Optional["StandingBase"]
     season_averages: list["TeamSeasonAverageBase"]
 
+
 class TeamWithStanding(TeamBase):
     standing: Optional["StandingBase"]
+
 
 class TeamStatsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     season_average: Optional["TeamSeasonAverageBase"]
     recent_game_stats: list["GameWithTeamStats"]
 
+
+from .game import GameBase, GameWithTeamStats
 from .player import PlayerBase
 from .standing import StandingBase
+from .team_game_stat import TeamGameStatBase  # noqa: F401
 from .team_season_average import TeamSeasonAverageBase
-from .team_game_stat import TeamGameStatBase
-from .game import GameBase, GameWithTeamStats
 
 TeamWithRoster.model_rebuild()
 TeamDetail.model_rebuild()
@@ -53,4 +62,3 @@ TeamWithGames.model_rebuild()
 TeamWithStandingAndAverage.model_rebuild()
 TeamWithStanding.model_rebuild()
 TeamStatsResponse.model_rebuild()
-

@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import date
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+
 
 class PlayerBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -10,13 +12,16 @@ class PlayerBase(BaseModel):
     last_name: str
     birth_date: Optional[date]
 
+
 class PlayerWithTeam(PlayerBase):
     team: "TeamBase"
+
 
 class PlayerDetail(PlayerBase):
     # Trimmed to base + team only. Dedicated endpoints exist for game_stats and
     # season_averages so eager-loading all of them here is unnecessary.
     team: "TeamBase"
+
 
 from .team import TeamBase
 

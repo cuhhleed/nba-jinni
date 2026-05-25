@@ -1,10 +1,9 @@
 from fastapi import HTTPException
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.session import get_session_factory
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 configure_logging()
 logger = get_logger("backend_api")

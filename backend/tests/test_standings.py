@@ -1,8 +1,10 @@
 """
 Happy-path tests for /standings and /standings/preview.
 One 404/empty case per endpoint per MEMORY.md guidance.
-Edge cases (e.g. tie-breaking, multi-season coexistence) to be discussed before expanding.
+Edge cases (e.g. tie-breaking, multi-season coexistence) to be discussed
+before expanding.
 """
+
 import pytest
 
 

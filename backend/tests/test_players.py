@@ -6,18 +6,19 @@ Happy-path tests for new player endpoints:
   GET /players/{player_id}/vs-opponent
   GET /players/top/recent-performances
 """
-import pytest
-import pytest_asyncio
+
 from datetime import date, datetime
 
-from nbajinni_shared.models.players import Player
+import pytest
+import pytest_asyncio
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
-
+from nbajinni_shared.models.players import Player
 
 # ---------------------------------------------------------------------------
 # Fixtures for recent-performances tests
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def rp_player_a(session, test_home_team):
@@ -40,7 +41,9 @@ async def rp_player_b(session, test_away_team):
 @pytest_asyncio.fixture
 async def rp_player_c(session, test_home_team):
     """Player C — on home team."""
-    p = Player(id=9003, first_name="Gamma", last_name="Three", team_id=test_home_team.id)
+    p = Player(
+        id=9003, first_name="Gamma", last_name="Three", team_id=test_home_team.id
+    )
     session.add(p)
     await session.flush()
     return p
@@ -91,11 +94,27 @@ async def rp_game_prior(session, test_season, test_home_team, test_away_team):
 
 def _make_stat(session, player, game, season, **kwargs):
     defaults = dict(
-        pos="SF", min=36,
-        fgm=10, fga=20, ftm=5, fta=7, tpm=2, tpa=5,
-        off_reb=2, def_reb=8, tos=3, pfs=2,
-        fgp=50.0, ftp=71.4, tpp=40.0, plus_minus=0,
-        points=0, tot_reb=0, asts=0, stls=0, blks=0,
+        pos="SF",
+        min=36,
+        fgm=10,
+        fga=20,
+        ftm=5,
+        fta=7,
+        tpm=2,
+        tpa=5,
+        off_reb=2,
+        def_reb=8,
+        tos=3,
+        pfs=2,
+        fgp=50.0,
+        ftp=71.4,
+        tpp=40.0,
+        plus_minus=0,
+        points=0,
+        tot_reb=0,
+        asts=0,
+        stls=0,
+        blks=0,
     )
     defaults.update(kwargs)
     stat = PlayerGameStat(
@@ -179,7 +198,8 @@ async def test_get_top_players_preview(
     assert response.status_code == 200
     data = response.json()
     assert set(data.keys()) == {"points", "rebounds", "assists", "steals", "blocks"}
-    # Our fixture has games_played=15 so floor applies; player should appear in all categories
+    # Our fixture has games_played=15 so floor applies; player should appear
+    # in all categories
     assert len(data["points"]) == 1
     assert data["points"][0]["player_id"] == test_player.id
 
@@ -188,49 +208,114 @@ async def test_get_top_players_preview(
 # GET /players/top/recent-performances
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_recent_performances_happy_path(
-    client, session, test_season,
-    rp_player_a, rp_player_b, rp_player_c, rp_player_d,
-    rp_game_recent, rp_game_prior,
+    client,
+    session,
+    test_season,
+    rp_player_a,
+    rp_player_b,
+    rp_player_c,
+    rp_player_d,
+    rp_game_recent,
+    rp_game_prior,
 ):
-    """4 qualifying performances across 2 game-days → returns exactly 3, ordered correctly.
+    """4 qualifying performances across 2 game-days → returns exactly 3,
+    ordered correctly.
 
     Player A (recent, base=38): ranked 1st (38+5=43).
     Player B (recent, base=36): ranked 2nd (36+5=41).
     Player C (prior, base=40): ranked 3rd (40+0=40).
     Player D (prior, base=37): 4th — excluded from top 3.
     """
-    _make_stat(session, rp_player_a, rp_game_recent, test_season.season,
-               points=20, tot_reb=10, asts=5, stls=2, blks=1)  # base=38
-    _make_stat(session, rp_player_b, rp_game_recent, test_season.season,
-               points=18, tot_reb=10, asts=5, stls=2, blks=1)  # base=36
-    _make_stat(session, rp_player_c, rp_game_prior, test_season.season,
-               points=22, tot_reb=10, asts=5, stls=2, blks=1)  # base=40
-    _make_stat(session, rp_player_d, rp_game_prior, test_season.season,
-               points=20, tot_reb=10, asts=4, stls=2, blks=1)  # base=37
+    _make_stat(
+        session,
+        rp_player_a,
+        rp_game_recent,
+        test_season.season,
+        points=20,
+        tot_reb=10,
+        asts=5,
+        stls=2,
+        blks=1,
+    )  # base=38
+    _make_stat(
+        session,
+        rp_player_b,
+        rp_game_recent,
+        test_season.season,
+        points=18,
+        tot_reb=10,
+        asts=5,
+        stls=2,
+        blks=1,
+    )  # base=36
+    _make_stat(
+        session,
+        rp_player_c,
+        rp_game_prior,
+        test_season.season,
+        points=22,
+        tot_reb=10,
+        asts=5,
+        stls=2,
+        blks=1,
+    )  # base=40
+    _make_stat(
+        session,
+        rp_player_d,
+        rp_game_prior,
+        test_season.season,
+        points=20,
+        tot_reb=10,
+        asts=4,
+        stls=2,
+        blks=1,
+    )  # base=37
     await session.flush()
 
     response = await client.get("/players/top/recent-performances")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 3
-    assert data[0]["player_id"] == rp_player_a.id   # 43
-    assert data[1]["player_id"] == rp_player_b.id   # 41
-    assert data[2]["player_id"] == rp_player_c.id   # 40
+    assert data[0]["player_id"] == rp_player_a.id  # 43
+    assert data[1]["player_id"] == rp_player_b.id  # 41
+    assert data[2]["player_id"] == rp_player_c.id  # 40
 
 
 @pytest.mark.asyncio
 async def test_recent_performances_threshold_filter(
-    client, session, test_season,
-    rp_player_a, rp_player_b,
+    client,
+    session,
+    test_season,
+    rp_player_a,
+    rp_player_b,
     rp_game_recent,
 ):
     """34-pt line excluded; 35-pt line included."""
-    _make_stat(session, rp_player_a, rp_game_recent, test_season.season,
-               points=34, tot_reb=0, asts=0, stls=0, blks=0)  # base=34 → excluded
-    _make_stat(session, rp_player_b, rp_game_recent, test_season.season,
-               points=35, tot_reb=0, asts=0, stls=0, blks=0)  # base=35 → included
+    _make_stat(
+        session,
+        rp_player_a,
+        rp_game_recent,
+        test_season.season,
+        points=34,
+        tot_reb=0,
+        asts=0,
+        stls=0,
+        blks=0,
+    )  # base=34 → excluded
+    _make_stat(
+        session,
+        rp_player_b,
+        rp_game_recent,
+        test_season.season,
+        points=35,
+        tot_reb=0,
+        asts=0,
+        stls=0,
+        blks=0,
+    )  # base=35 → included
     await session.flush()
 
     response = await client.get("/players/top/recent-performances")
@@ -242,15 +327,38 @@ async def test_recent_performances_threshold_filter(
 
 @pytest.mark.asyncio
 async def test_recent_performances_bonus_tiebreaker(
-    client, session, test_season,
-    rp_player_a, rp_player_b,
-    rp_game_recent, rp_game_prior,
+    client,
+    session,
+    test_season,
+    rp_player_a,
+    rp_player_b,
+    rp_game_recent,
+    rp_game_prior,
 ):
-    """base=40 from most-recent (score=45) outranks base=44 from prior day (score=44)."""
-    _make_stat(session, rp_player_a, rp_game_recent, test_season.season,
-               points=20, tot_reb=10, asts=5, stls=3, blks=2)  # base=40, score=45
-    _make_stat(session, rp_player_b, rp_game_prior, test_season.season,
-               points=22, tot_reb=12, asts=5, stls=3, blks=2)  # base=44, score=44
+    """base=40 from most-recent (score=45) outranks base=44 from prior day
+    (score=44)."""
+    _make_stat(
+        session,
+        rp_player_a,
+        rp_game_recent,
+        test_season.season,
+        points=20,
+        tot_reb=10,
+        asts=5,
+        stls=3,
+        blks=2,
+    )  # base=40, score=45
+    _make_stat(
+        session,
+        rp_player_b,
+        rp_game_prior,
+        test_season.season,
+        points=22,
+        tot_reb=12,
+        asts=5,
+        stls=3,
+        blks=2,
+    )  # base=44, score=44
     await session.flush()
 
     response = await client.get("/players/top/recent-performances")
@@ -271,15 +379,36 @@ async def test_recent_performances_sparse_data(client):
 
 @pytest.mark.asyncio
 async def test_recent_performances_sparse_two_qualifying(
-    client, session, test_season,
-    rp_player_a, rp_player_b,
+    client,
+    session,
+    test_season,
+    rp_player_a,
+    rp_player_b,
     rp_game_recent,
 ):
     """2 qualifying rows → returns 2 (not padded to 3)."""
-    _make_stat(session, rp_player_a, rp_game_recent, test_season.season,
-               points=20, tot_reb=8, asts=5, stls=1, blks=1)  # base=35
-    _make_stat(session, rp_player_b, rp_game_recent, test_season.season,
-               points=18, tot_reb=10, asts=5, stls=2, blks=2)  # base=37
+    _make_stat(
+        session,
+        rp_player_a,
+        rp_game_recent,
+        test_season.season,
+        points=20,
+        tot_reb=8,
+        asts=5,
+        stls=1,
+        blks=1,
+    )  # base=35
+    _make_stat(
+        session,
+        rp_player_b,
+        rp_game_recent,
+        test_season.season,
+        points=18,
+        tot_reb=10,
+        asts=5,
+        stls=2,
+        blks=2,
+    )  # base=37
     await session.flush()
 
     response = await client.get("/players/top/recent-performances")
@@ -290,17 +419,49 @@ async def test_recent_performances_sparse_two_qualifying(
 
 @pytest.mark.asyncio
 async def test_recent_performances_one_day_only(
-    client, session, test_season,
-    rp_player_a, rp_player_b, rp_player_c,
+    client,
+    session,
+    test_season,
+    rp_player_a,
+    rp_player_b,
+    rp_player_c,
     rp_game_recent,
 ):
-    """Only the most-recent day has games — bonus applied equally to all; top by base."""
-    _make_stat(session, rp_player_a, rp_game_recent, test_season.season,
-               points=22, tot_reb=10, asts=5, stls=2, blks=2)  # base=41
-    _make_stat(session, rp_player_b, rp_game_recent, test_season.season,
-               points=20, tot_reb=10, asts=5, stls=2, blks=1)  # base=38
-    _make_stat(session, rp_player_c, rp_game_recent, test_season.season,
-               points=18, tot_reb=10, asts=5, stls=1, blks=1)  # base=35
+    """Only the most-recent day has games — bonus applied equally to all;
+    top by base."""
+    _make_stat(
+        session,
+        rp_player_a,
+        rp_game_recent,
+        test_season.season,
+        points=22,
+        tot_reb=10,
+        asts=5,
+        stls=2,
+        blks=2,
+    )  # base=41
+    _make_stat(
+        session,
+        rp_player_b,
+        rp_game_recent,
+        test_season.season,
+        points=20,
+        tot_reb=10,
+        asts=5,
+        stls=2,
+        blks=1,
+    )  # base=38
+    _make_stat(
+        session,
+        rp_player_c,
+        rp_game_recent,
+        test_season.season,
+        points=18,
+        tot_reb=10,
+        asts=5,
+        stls=1,
+        blks=1,
+    )  # base=35
     await session.flush()
 
     response = await client.get("/players/top/recent-performances")

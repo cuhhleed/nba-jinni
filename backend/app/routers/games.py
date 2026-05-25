@@ -2,28 +2,27 @@ import asyncio
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy import select, or_
-
-from nba_api.live.nba.endpoints import ScoreBoard, BoxScore
-
+from nba_api.live.nba.endpoints import BoxScore, ScoreBoard
 from nbajinni_shared.logging import configure_logging, get_logger
-from nbajinni_shared.models.teams import Team
-from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
-from ..dependencies import get_db, get_current_season
+from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
+from nbajinni_shared.models.teams import Team
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from ..cache.stale_cache import StaleCache
+from ..dependencies import get_current_season, get_db
 from ..schemas.game import (
     GameBase,
+    GameDetailResponse,
+    GameLive,
     GamePreview,
     GameResult,
-    GameDetailResponse,
     GameWithTeamStats,
-    GameLive,
-    LiveScoreboardResponse,
     LiveScoreboardEntry,
+    LiveScoreboardResponse,
     PlayerLiveStat,
 )
 from ..schemas.player_game_stat import PlayerGameStatBase, PlayerGameStatWithName
@@ -41,7 +40,7 @@ _GAME_STATUS_MAP = {1: "scheduled", 2: "live", 3: "final"}
 # flags with HTTP 403 + an HTML "Access Denied" page. We override with a current
 # Chrome fingerprint plus Origin/Referer/sec-ch-ua headers.
 _LIVE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate, br",

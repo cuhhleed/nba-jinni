@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.standings import Standing
-from ..dependencies import get_db, get_current_season
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..dependencies import get_current_season, get_db
 from ..schemas.standing import StandingBase
 
 configure_logging()
