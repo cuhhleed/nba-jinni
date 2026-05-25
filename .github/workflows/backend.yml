@@ -79,6 +79,7 @@ jobs:
       - name: Bootstrap test schema (Base.metadata.create_all, not Alembic per ADR-005)
         working-directory: backend
         env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
           TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
         run: |
           poetry run python -c "
@@ -106,6 +107,7 @@ jobs:
       - name: Run pytest
         working-directory: backend
         env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
           TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
         run: poetry run pytest -v
 
