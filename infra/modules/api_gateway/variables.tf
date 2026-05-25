@@ -15,6 +15,11 @@ variable "protocol_type" {
   default     = "HTTP"
 }
 
+variable "cors_allowed_origins" {
+  description = "List of origins permitted by the API Gateway CORS configuration."
+  type        = list(string)
+}
+
 # API Gateway Integration resource
 variable "integration_type" {
   description = "Integration type of an integration."

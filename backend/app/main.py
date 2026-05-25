@@ -1,9 +1,7 @@
 from mangum import Mangum
 from fastapi import Depends, FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-import os
 from dotenv import load_dotenv
 
 from nbajinni_shared.logging import configure_logging, get_logger
@@ -20,18 +18,6 @@ app.include_router(players.router)
 app.include_router(teams.router)
 app.include_router(games.router)
 app.include_router(standings.router)
-
-origins = [
-    os.getenv("FRONTEND_ORIGIN")
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.get("/")
 async def root():
