@@ -131,21 +131,21 @@ module "lambda_backend" {
   security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
-    DB_HOST         = module.rds.endpoint
-    DB_NAME         = module.rds.db_name
-    DB_USER         = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
-    DB_PASSWORD     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
-    FRONTEND_ORIGIN = "https://${module.cloudfront_frontend.domain_name}"
+    DB_HOST     = module.rds.endpoint
+    DB_NAME     = module.rds.db_name
+    DB_USER     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
+    DB_PASSWORD = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
   }
 }
 
 module "api_gateway" {
   source = "../../modules/api_gateway"
 
-  project_name      = var.project_name
-  environment       = var.environment
-  lambda_invoke_arn = module.lambda_backend.invoke_arn
-  lambda_arn        = module.lambda_backend.arn
+  project_name         = var.project_name
+  environment          = var.environment
+  lambda_invoke_arn    = module.lambda_backend.invoke_arn
+  lambda_arn           = module.lambda_backend.arn
+  cors_allowed_origins = ["https://${module.cloudfront_frontend.domain_name}"]
 }
 
 module "s3_frontend" {
