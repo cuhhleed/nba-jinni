@@ -3,17 +3,17 @@ name: Loader CI
 on:
   pull_request:
     paths:
-      - 'loader/**'
-      - 'shared/**'
-      - 'scripts/package_loader.sh'
-      - '.github/workflows/loader.yml'
+      - "loader/**"
+      - "shared/**"
+      - "scripts/package_loader.sh"
+      - ".github/workflows/loader.yml"
   push:
     branches: [main]
     paths:
-      - 'loader/**'
-      - 'shared/**'
-      - 'scripts/package_loader.sh'
-      - '.github/workflows/loader.yml'
+      - "loader/**"
+      - "shared/**"
+      - "scripts/package_loader.sh"
+      - ".github/workflows/loader.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,12 +26,12 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: "3.12"
   TF_VERSION: 1.10.0
   TF_WORKING_DIR_DEV: infra/environments/dev
   TF_WORKING_DIR_PROD: infra/environments/prod
-  LOADER_LAMBDA_DEV: nbajinni-dev-loader
-  LOADER_LAMBDA_PROD: nbajinni-prod-loader
+  LOADER_LAMBDA_DEV: nbajinni-dev-data-loader
+  LOADER_LAMBDA_PROD: nbajinni-prod-data-loader
   LAMBDA_ARTIFACTS_BUCKET_DEV: nbajinni-dev-lambda-artifacts
   LAMBDA_ARTIFACTS_BUCKET_PROD: nbajinni-prod-lambda-artifacts
 
@@ -56,12 +56,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # needed for `git diff` against the PR base in the schema-amendment lint
+          fetch-depth: 0 # needed for `git diff` against the PR base in the schema-amendment lint
 
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          cache: "pip"
 
       - name: Schema-amendment lint (FEATURE-007 / FEATURE-010)
         id: schema_lint
