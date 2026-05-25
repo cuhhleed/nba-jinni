@@ -21,6 +21,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
     environment  = var.environment
     account_id   = var.account_id
     aws_region   = var.aws_region
+    state_bucket = var.state_bucket
   })
 
   tags = {
