@@ -12,3 +12,6 @@ asyncpg = "^0.31.0"
 boto3 = "^1.38.0"
 alembic = "^1.13.0"
 nbajinni-shared = { path = "../shared" }
+flake8 = "^7.3.0"
+black = "^26.5.1"
+isort = "^8.0.1"
