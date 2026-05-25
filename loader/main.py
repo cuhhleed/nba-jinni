@@ -4,18 +4,18 @@ Environment variables (injected by Terraform):
     DB_HOST (endpoint with port), DB_NAME, DB_USER, DB_PASSWORD
     DATA_BUCKET_NAME
 """
+
 import asyncio
 import json
 import os
 from datetime import date, datetime
-from alembic.config import Config
-from alembic import command
 
 import boto3
-from sqlalchemy import text
-
+from alembic import command
+from alembic.config import Config
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.session import get_session_factory
+from sqlalchemy import text
 
 configure_logging()
 logger = get_logger("loader")
@@ -65,7 +65,9 @@ def _fetch_json(s3_client, bucket: str, table: str) -> list[dict]:
         response = s3_client.get_object(Bucket=bucket, Key=key)
         return json.loads(response["Body"].read())
     except Exception as e:
-        logger.error("s3_fetch_failed", table=table, key=key, bucket=bucket, error=str(e))
+        logger.error(
+            "s3_fetch_failed", table=table, key=key, bucket=bucket, error=str(e)
+        )
         raise
 
 
@@ -98,18 +100,19 @@ async def load(bucket: str):
                 columns = list(rows[0].keys())
                 placeholders = ", ".join(f":{col}" for col in columns)
                 col_list = ", ".join(f'"{col}"' for col in columns)
-                stmt = text(
-                    f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
-                )
+                stmt = text(f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})")
                 parsed = [_parse_row(table, row) for row in rows]
 
                 try:
                     await session.execute(stmt, parsed)
                 except Exception as e:
-                    logger.error("insert_failed", table=table, rows=len(rows), error=str(e))
+                    logger.error(
+                        "insert_failed", table=table, rows=len(rows), error=str(e)
+                    )
                     raise
 
                 logger.info("table_loaded", table=table, rows=len(rows))
+
 
 def migrate():
     try:
@@ -119,6 +122,7 @@ def migrate():
     except Exception as e:
         logger.error("migration_failed", error=str(e))
         raise
+
 
 def handler(event, context):
     action = event.get("action")
@@ -131,7 +135,7 @@ def handler(event, context):
         body_message = "Migration and load complete."
     elif action != "load":
         return {"statusCode": 500, "body": "Invalid action given."}
-    
+
     try:
         asyncio.run(load(bucket))
         logger.info("load_complete", tables=len(TABLE_ORDER))

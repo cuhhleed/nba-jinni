@@ -12,3 +12,18 @@ asyncpg = "^0.31.0"
 boto3 = "^1.38.0"
 alembic = "^1.13.0"
 nbajinni-shared = { path = "../shared" }
+flake8 = "^7.3.0"
+black = "^26.5.1"
+isort = "^8.0.1"
+pytest = "^9.0.3"
+dotenv = "^0.9.9"
+pytest-asyncio = "^1.3.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"          # handles all async test functions automatically
+pythonpath = ["."]             # makes main.py importable from the project root
+testpaths = ["tests"]          # where pytest looks for tests
+filterwarnings = [
+    "error::RuntimeWarning",
+    "error::pytest.PytestUnraisableExceptionWarning"
+]

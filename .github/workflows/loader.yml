@@ -1,0 +1,304 @@
+name: Loader CI
+
+on:
+  pull_request:
+    paths:
+      - "loader/**"
+      - "shared/**"
+      - "scripts/package_loader.sh"
+      - ".github/workflows/loader.yml"
+  push:
+    branches: [main]
+    paths:
+      - "loader/**"
+      - "shared/**"
+      - "scripts/package_loader.sh"
+      - ".github/workflows/loader.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: loader-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.12"
+  TF_VERSION: 1.10.0
+  TF_WORKING_DIR_DEV: infra/environments/dev
+  TF_WORKING_DIR_PROD: infra/environments/prod
+  LOADER_LAMBDA_DEV: nbajinni-dev-data-loader
+  LOADER_LAMBDA_PROD: nbajinni-prod-data-loader
+  LAMBDA_ARTIFACTS_BUCKET_DEV: nbajinni-dev-lambda-artifacts
+  LAMBDA_ARTIFACTS_BUCKET_PROD: nbajinni-prod-lambda-artifacts
+
+jobs:
+  pr-checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nbajinni_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for `git diff` against the PR base in the schema-amendment lint
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Schema-amendment lint (FEATURE-007 / FEATURE-010)
+        id: schema_lint
+        run: |
+          set -eo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          MIGRATIONS=$(git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" -- shared/alembic/versions/ | tr '\n' ' ')
+          if [ -z "$MIGRATIONS" ]; then
+            echo "No migration files changed in this PR. Skipping schema-amendment lint."
+            exit 0
+          fi
+          echo "Changed migrations: $MIGRATIONS"
+          python scripts/lint_schema_amendments.py $MIGRATIONS
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+
+      - name: Install loader dependencies
+        working-directory: loader
+        run: poetry install --no-interaction --no-root
+
+      - name: Lint with flake8
+        working-directory: loader
+        run: poetry run flake8 .
+
+      - name: Lint with black
+        working-directory: loader
+        run: poetry run black --check .
+
+      - name: Bootstrap test schema (Base.metadata.create_all, not Alembic per ADR-005)
+        working-directory: loader
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
+        run: |
+          poetry run python -c "
+          import asyncio, os
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from nbajinni_shared.base import Base
+          import nbajinni_shared.models.teams
+          import nbajinni_shared.models.players
+          import nbajinni_shared.models.games
+          import nbajinni_shared.models.seasons
+          import nbajinni_shared.models.standings
+          import nbajinni_shared.models.player_game_stats
+          import nbajinni_shared.models.team_game_stats
+          import nbajinni_shared.models.player_season_averages
+          import nbajinni_shared.models.team_season_averages
+          import nbajinni_shared.models.users
+          async def main():
+              engine = create_async_engine(os.environ['TEST_DATABASE_URL'])
+              async with engine.begin() as conn:
+                  await conn.run_sync(Base.metadata.create_all)
+              await engine.dispose()
+          asyncio.run(main())
+          "
+
+      - name: Run pytest
+        working-directory: loader
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
+        run: poetry run pytest -v
+
+  deploy-dev:
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: loader-deploy-dev
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Build loader.zip
+        run: bash scripts/package_loader.sh
+
+      - name: Assert zip bundles /shared (ADR-005) and Alembic (ADR-005)
+        run: |
+          set -e
+          unzip -l infra/loader.zip | grep -q 'nbajinni_shared/' || { echo "FAIL: /shared not bundled (ADR-005)"; exit 1; }
+          unzip -l infra/loader.zip | grep -q 'alembic/'        || { echo "FAIL: Alembic not bundled (ADR-005)"; exit 1; }
+          echo "Zip content assertions passed."
+
+      - name: Stage zip to S3
+        run: aws s3 cp infra/loader.zip s3://${{ env.LAMBDA_ARTIFACTS_BUCKET_DEV }}/loader.zip
+
+      - name: Deploy Lambda
+        run: aws lambda update-function-code --function-name "${{ env.LOADER_LAMBDA_DEV }}" --s3-bucket "${{ env.LAMBDA_ARTIFACTS_BUCKET_DEV }}" --s3-key loader.zip --publish
+
+      - name: Wait for Lambda update to settle
+        run: aws lambda wait function-updated-v2 --function-name "${{ env.LOADER_LAMBDA_DEV }}"
+
+      - name: Terraform init (for output read)
+        working-directory: ${{ env.TF_WORKING_DIR_DEV }}
+        run: terraform init -input=false
+
+      - name: Invoke Loader with migrate action
+        run: |
+          set -e
+          RESPONSE=$(aws lambda invoke \
+          --function-name "nbajinni-dev-data-loader" \
+          --payload '{"action":"migrate"}' \
+          --cli-binary-format raw-in-base64-out \
+          --cli-read-timeout 300 \
+          --output json \
+          /tmp/lambda_response.json)
+          echo "$RESPONSE"
+
+          # Parse JSON and check for errors
+          python -c "
+          import json, sys
+          with open('/tmp/lambda_response.json') as f:
+              response = json.load(f)
+          if 'error' in response:
+              print(f'Lambda returned an error: {response[\"error\"]}')
+              sys.exit(1)
+          status = response.get('statusCode', 200)
+          if status != 200:
+              print(f'Lambda returned non-200 status: {status}')
+              sys.exit(1)
+          print('Loader migration succeeded.')
+          "
+
+  # NOTE: This job will fail at the terraform init / RDS check / Lambda invoke step until
+  # infra/environments/prod/ exists and the prod Loader Lambda + artifacts
+  # bucket are provisioned. See FEATURE-011.
+  # Approval gate is handled by `environment: prod` (Story 7.1 required reviewer).
+  deploy-prod:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: loader-deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Build loader.zip
+        run: bash scripts/package_loader.sh
+
+      - name: Assert zip bundles /shared (ADR-005) and Alembic (ADR-005)
+        run: |
+          set -e
+          unzip -l infra/loader.zip | grep -q 'nbajinni_shared/' || { echo "FAIL: /shared not bundled (ADR-005)"; exit 1; }
+          unzip -l infra/loader.zip | grep -q 'alembic/'        || { echo "FAIL: Alembic not bundled (ADR-005)"; exit 1; }
+          echo "Zip content assertions passed."
+
+      - name: Stage zip to S3
+        run: aws s3 cp infra/loader.zip s3://${{ env.LAMBDA_ARTIFACTS_BUCKET_PROD }}/loader.zip
+
+      - name: Deploy Lambda
+        run: aws lambda update-function-code --function-name "${{ env.LOADER_LAMBDA_PROD }}" --s3-bucket "${{ env.LAMBDA_ARTIFACTS_BUCKET_PROD }}" --s3-key loader.zip --publish
+
+      - name: Wait for Lambda update to settle
+        run: aws lambda wait function-updated-v2 --function-name "${{ env.LOADER_LAMBDA_PROD }}"
+
+      - name: Terraform init (for output read)
+        working-directory: ${{ env.TF_WORKING_DIR_PROD }}
+        run: terraform init -input=false
+
+      - name: Read prod RDS endpoint from Terraform output
+        id: tf_out
+        working-directory: ${{ env.TF_WORKING_DIR_PROD }}
+        run: echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> $GITHUB_OUTPUT
+
+      - name: RDS pre-flight connectivity check
+        run: |
+          set -e
+          ENDPOINT="${{ steps.tf_out.outputs.rds_endpoint }}"
+          HOST="${ENDPOINT%:*}"
+          PORT="${ENDPOINT##*:}"
+          python -c "
+          import socket
+          import sys
+          try:
+              socket.create_connection(('$HOST', $PORT), timeout=5)
+              print('RDS endpoint reachable')
+          except Exception as e:
+              print(f'RDS endpoint unreachable: {e}')
+              sys.exit(1)
+          "
+
+      - name: Invoke Loader with migrate action
+        run: |
+          set -e
+          RESPONSE=$(aws lambda invoke \
+            --function-name "${{ env.LOADER_LAMBDA_PROD }}" \
+            --payload '{"action":"migrate"}' \
+            --cli-read-timeout 300 \
+            /dev/stdout)
+          echo "$RESPONSE"
+
+          # Parse JSON and check for errors
+          python -c "
+          import json
+          import sys
+          try:
+              response = json.loads(r'''$RESPONSE''')
+              if 'error' in response:
+                  print(f'Lambda returned an error: {response[\"error\"]}')
+                  sys.exit(1)
+              status = response.get('statusCode', 200)
+              if status != 200:
+                  print(f'Lambda returned non-200 status: {status}')
+                  sys.exit(1)
+              print('Loader migration succeeded.')
+          except json.JSONDecodeError as e:
+              print(f'Failed to parse Lambda response as JSON: {e}')
+              sys.exit(1)
+          "

@@ -589,3 +589,66 @@ FEATURE-007 (`docs/SCHEMA_AMENDMENTS.md`) prescribes a four-touch-point workflow
 - [ ] Verify end-to-end per Story 7.5 verification checklist
 
 ---
+
+## FEATURE-011 — Loader Lambda CI/CD Workflow
+
+### Status
+
+PROPOSED
+
+### Background
+
+Story 7.1 (ADR-010) established OIDC + app-deploy IAM roles. Stories 7.2 and 7.3 (FEATURE-008, FEATURE-009) added Terraform and backend Lambda CI pipelines. Story 7.4 adds the Loader Lambda's PR-test + dev-deploy + prod-promote pipeline. The Loader Lambda is distinct from the backend Lambda: it's a one-shot migration orchestrator invoked via `aws lambda invoke --payload '{"action":"migrate"}'` during deploys, not a stateless request handler.
+
+### Problem
+
+1. Today, migrations are run manually (`alembic upgrade head`) or not at all in CI. Every deploy's risk includes "are migrations up to date?" as a hidden concern.
+2. Schema amendments (new columns, type changes) are validated via code review + the FEATURE-007 touch-point checklist, but there's no automated check that migrations are syntactically correct until they run in prod (first time touched).
+3. Pre-flight checks (RDS reachability) are manual; infrastructure problems surface at the wrong moment (during migration, not during deploy validation).
+
+### Constraints
+
+- OIDC trust pattern must match ADR-010 (`environment:` declaration is mandatory on every deploy job — sub-claim gate).
+- App-deploy role permissions must not be expanded. IAM audit confirms current role already grants `lambda:UpdateFunctionCode`, `s3:PutObject` to lambda-artifacts bucket, and `rds:DescribeDBInstances` — sufficient.
+- Loader zip with Alembic + shared models + migrations is large; must be S3-staged like backend (inline ~50 MB limit).
+- Loader invocation payload is JSON; response parsing must handle edge cases (non-JSON response, error key, non-200 status).
+- Schema-amendment lint (Story 7.5 / FEATURE-010) must run in this PR job as a cross-check (migration syntax validated at PR time, not first-deploy time).
+
+### Proposed Solution
+
+1. New workflow `.github/workflows/loader.yml` with three jobs: `pr-checks` (lint + pytest against Postgres service container + schema-amendment lint), `deploy-dev` (fires on `pull_request` events whose base is `main` — preview-deploy pattern), `deploy-prod` (fires on `push` to `main` after PR merge, or on `workflow_dispatch`; gated by prod GitHub Environment approval).
+
+2. Loader Lambda function names hardcoded in workflow-level `env:` block (`LOADER_LAMBDA_DEV: nbajinni-dev-loader`, `LOADER_LAMBDA_PROD: nbajinni-prod-loader`) — not stored as GH secrets. Same rationale as FEATURE-008 and FEATURE-009.
+
+3. Zip staged through `s3://nbajinni-<env>-lambda-artifacts/loader.zip`, then deployed via `aws lambda update-function-code --s3-bucket / --s3-key`. Handles large zips with Alembic migrations + /shared + dependencies.
+
+4. Pre-deploy RDS reachability check via socket connectivity test (Python) — fails fast if infrastructure is unavailable. Reads RDS endpoint from `terraform output -raw rds_endpoint`.
+
+5. Loader invocation with `{"action":"migrate"}` — captures output, parses JSON response, checks for error keys and HTTP status. Timeout set to 5 min (300 sec) to cover slow migrations.
+
+6. Schema-amendment lint (FEATURE-010) wired into PR job — exact copy of the step from Story 7.5's backend.yml snippet. Validates touch-points (model, migration, parser, DATE_COLUMNS) before the PR is merged.
+
+7. PR pytest uses Postgres 16 service container + schema bootstrap (`Base.metadata.create_all()`), mirroring backend.yml. Carve-out from ADR-005 documented in FEATURE-009 applies here as well.
+
+### Watch Points
+
+- `deploy-prod` will fail until `infra/environments/prod/` exists AND `nbajinni-prod-loader` Lambda + `nbajinni-prod-lambda-artifacts` bucket are provisioned. Documented inline in the workflow; matches Stories 7.2–7.3 wire-but-fail shape.
+- RDS pre-flight checks for connectivity via socket — if RDS is restarting / upgrading, migration fails. Intentional (don't run migrations on unstable DB). Operator must investigate delay and re-run workflow.
+- The Loader invocation response parsing is defensive (handles non-JSON, missing fields, non-200 status). If Lambda response format changes, workflow may need updates.
+- Zip assertion checks for `alembic/` in the archive; if future refactoring moves migrations elsewhere, the assertion must be updated.
+- Poetry version pinned in workflow (`pipx install poetry==1.8.3`); bump in sync with local dev.
+
+### Tasks
+
+- [x] Create `.github/workflows/loader.yml` with `pr-checks`, `deploy-dev`, `deploy-prod` jobs
+- [x] Hardcode loader Lambda function names + artifacts bucket names in workflow `env:` (no GH secrets for these)
+- [x] Add Postgres 16 service container and schema-bootstrap step for PR tests
+- [x] Wire schema-amendment lint from FEATURE-010 into PR job
+- [x] Add RDS pre-flight connectivity check before migration invocation
+- [x] Add Loader invocation with `{"action":"migrate"}` and response parsing
+- [x] Add zip content assertion (`/shared` + `alembic`) before deploy
+- [x] Update `docs/project-plan.md` Story 7.4 task checkboxes (rewrite the "store function names as secrets" line)
+- [ ] Verify end-to-end: trivial loader PR exercises `pr-checks`, merge to main exercises `deploy-dev`, `workflow_dispatch` exercises `deploy-prod` (expected to fail until prod env exists)
+- [ ] After prod env exists in a future story, manually run `Actions → Loader CI → Run workflow` to confirm prod path and flip this FEATURE to IMPLEMENTED
+
+---
