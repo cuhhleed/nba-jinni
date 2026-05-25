@@ -157,6 +157,18 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build loader.zip
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/package_loader.sh
+
+      - name: Upload loader.zip to S3
+        working-directory: ${{ github.workspace }}
+        run: aws s3 cp infra/loader.zip s3://nbajinni-dev-lambda-artifacts/loader.zip
+
       - name: Terraform init
         run: terraform init -input=false
 
@@ -195,6 +207,18 @@ jobs:
           role-to-assume: ${{ secrets.TF_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build loader.zip
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/package_loader.sh
+
+      - name: Upload loader.zip to S3
+        working-directory: ${{ github.workspace }}
+        run: aws s3 cp infra/loader.zip s3://nbajinni-prod-lambda-artifacts/loader.zip
 
       - name: Terraform init
         run: terraform init -input=false
