@@ -540,3 +540,52 @@ Story 7.1 (ADR-010) established OIDC + per-environment app-deploy IAM roles. Sto
 - [ ] After prod env exists in a future story, manually run `Actions → Backend CI → Run workflow` to confirm prod path and flip this FEATURE to IMPLEMENTED
 
 ---
+
+## FEATURE-010 — Schema-Amendment Lint for CI
+
+### Status
+
+PROPOSED
+
+### Background
+
+FEATURE-007 (`docs/SCHEMA_AMENDMENTS.md`) prescribes a four-touch-point workflow for schema amendments to populated tables. Today the checklist is enforced by code review + the runtime `add_required_column()` helper, which only validates the migration's own shape. Stories 7.2 / 7.3 added CI gating for Terraform and the backend Lambda; Story 7.5 adds a parallel gate for schema amendments — a static lint that runs on every PR touching `shared/alembic/versions/` and verifies the four touch-points are updated together.
+
+### Problem
+
+1. The highest-risk omission (`set_={...}` on conflict) is structurally invisible to existing test suites: rows insert successfully with the wrong (synthesized) value and propagate to RDS via the JSON export. Failures manifest at production query time as "every row has the same value," not as a constraint error.
+2. The model / `DATE_COLUMNS` / `.values()` omissions each manifest at different points downstream (next ingestion, next loader invocation, next backfill). All three are caught at PR review *if the reviewer remembers the checklist* — a weak gate.
+3. The runtime `add_required_column` helper only enforces migration-side correctness. It cannot inspect other files.
+
+### Constraints
+
+- Lint must run in CI without `poetry install` overhead (used in fast-path PR jobs).
+- Lint must only fail on touch-points that the PR's specific migration diff requires — must not flag pre-existing inconsistencies.
+- Lint must handle three migration shapes (`op.add_column`, `add_required_column`, `op.create_table`) per the existing repo conventions.
+- Lint must be runnable locally (`python scripts/lint_schema_amendments.py shared/alembic/versions/<file>.py`) so an author can iterate before pushing.
+
+### Proposed Solution
+
+1. New script `scripts/lint_schema_amendments.py` — stdlib-only Python (`ast`, `pathlib`, `argparse`, `re`, `sys`). Takes migration file paths as positional args, parses each to extract added columns (`(table, column, sql_type, nullable, server_default)` tuples), and verifies the four touch-points per the FEATURE-007 checklist. Exits 1 on any violation, 0 otherwise.
+2. Wired into `.github/workflows/backend.yml`'s `pr-checks` job as a step that runs after Python setup and before any other lint step (fail-fast). The step uses `git diff --diff-filter=AM` against the PR base SHA to discover changed migrations; passes them as positional args. `actions/checkout@v4` is updated with `fetch-depth: 0` so the diff works.
+3. Will be wired into `.github/workflows/loader.yml`'s PR job by Story 7.4's executor using the snippet documented in Story 7.5's plan.
+4. New `scripts/tests/test_lint_schema_amendments.py` — pytest cases for each check (happy path + each failure mode + `create_table` carve-out + PK/FK exclusion). Runnable via `cd scripts && python -m pytest tests/`. Not wired into the workflow's pytest job (different package); covered by manual local runs and any future scripts-package CI.
+5. Violation messages are formatted as one line per violation with the citation `(FEATURE-007: <touch-point>)` so PR authors can find the doc.
+
+### Watch Points
+
+- Lint maps tables to model files by naming convention (`<table>` → `shared/nbajinni_shared/models/<table>.py`). If a future model is named differently (e.g., a single file declaring multiple tables), the lint will false-negative on the model check. Acceptable tradeoff: keep the convention; if it ever breaks, the lint's fix is a small `__tablename__` AST-walk extension.
+- Lint scans `shared/nbajinni_shared/utils.py` for upsert patterns. If a future ingestion module moves to a different file (e.g., `shared/nbajinni_shared/ingest/<table>.py`), the lint must be extended. Track this as a follow-up if/when the ingestion code is split.
+- `op.create_table` carve-out skips upsert + DATE_COLUMNS + server_default checks for every column in the table. If a developer adds a `create_table` for a populated-data table (rare), they bypass the lint. The carve-out is correct for genuinely new tables; document this as a known tradeoff.
+- The lint does not check `op.alter_column` or `op.drop_column` operations. Modifying or removing columns is rare enough today that code review remains the gate. Revisit if drop-column omissions become a recurring issue.
+
+### Tasks
+
+- [ ] Create `scripts/lint_schema_amendments.py` (stdlib-only)
+- [ ] Create `scripts/tests/test_lint_schema_amendments.py` (pytest cases for each check)
+- [ ] Add `scripts/tests/__init__.py`
+- [ ] Update `.github/workflows/backend.yml` `pr-checks` job: `fetch-depth: 0` on checkout, new lint step before flake8
+- [ ] Document the `loader.yml` wiring snippet for Story 7.4's executor (in this plan + here)
+- [ ] Verify end-to-end per Story 7.5 verification checklist
+
+---

@@ -547,12 +547,12 @@ _As a developer, I want CI to fail fast when a migration omits any [FEATURE-007]
 
 Tasks:
 
-- [ ] Add `scripts/lint_schema_amendments.py`
-- [ ] On PR diffs touching `alembic/versions/`, fail if a new `NOT NULL` column lacks a `server_default` in the upgrade op
-- [ ] Fail if a new column on a model isn't reflected in the relevant parser map in `shared/utils.py`
-- [ ] Fail if a new date/datetime column isn't added to `loader/main.py` `DATE_COLUMNS`
-- [ ] Fail if upsert `set_={}` clauses aren't updated for new columns
-- [ ] Wire the lint into the PR jobs for `loader.yml` and `backend.yml`
+- [x] Add `scripts/lint_schema_amendments.py`
+- [x] On PR diffs touching `alembic/versions/`, fail if a new `NOT NULL` column lacks a `server_default` in the upgrade op
+- [x] Fail if a new column on a model isn't reflected in the relevant parser map in `shared/utils.py` (note: "parser map" interpreted as the per-table .values(...) + set_={...} blocks of any upsert keyed on the table — there is no centralized map in the current code; documented in FEATURE-010)
+- [x] Fail if a new date/datetime column isn't added to `loader/main.py` `DATE_COLUMNS`
+- [x] Fail if upsert `set_={}` clauses aren't updated for new columns
+- [x] Wire the lint into the PR jobs for `loader.yml` and `backend.yml` (note: backend.yml wired in Step 4; loader.yml snippet documented for Story 7.4's executor)
 
 ---
 

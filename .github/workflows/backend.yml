@@ -55,11 +55,27 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for `git diff` against the PR base in the schema-amendment lint
 
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+
+      - name: Schema-amendment lint (FEATURE-007 / FEATURE-010)
+        id: schema_lint
+        run: |
+          set -eo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          MIGRATIONS=$(git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" -- shared/alembic/versions/ | tr '\n' ' ')
+          if [ -z "$MIGRATIONS" ]; then
+            echo "No migration files changed in this PR. Skipping schema-amendment lint."
+            exit 0
+          fi
+          echo "Changed migrations: $MIGRATIONS"
+          python scripts/lint_schema_amendments.py $MIGRATIONS
 
       - name: Install Poetry
         run: pipx install poetry==1.8.3
