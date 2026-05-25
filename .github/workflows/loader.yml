@@ -199,9 +199,6 @@ jobs:
               print(f'Lambda returned non-200 status: {status}')
               sys.exit(1)
           print('Loader migration succeeded.')
-          except json.JSONDecodeError as e:
-              print(f'Failed to parse Lambda response as JSON: {e}')
-              sys.exit(1)
           "
 
   # NOTE: This job will fail at the terraform init / RDS check / Lambda invoke step until
