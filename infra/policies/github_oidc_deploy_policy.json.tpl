@@ -62,6 +62,23 @@
         "logs:FilterLogEvents"
       ],
       "Resource": "arn:aws:logs:${aws_region}:${account_id}:log-group:/aws/lambda/${project_name}-${environment}-*:*"
+    },
+    {
+      "Sid": "TerraformStateBucketRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}"
+    },
+    {
+      "Sid": "TerraformStateObjectsRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}/environments/${environment}/*"
     }
   ]
 }
