@@ -178,27 +178,27 @@ jobs:
         run: |
           set -e
           RESPONSE=$(aws lambda invoke \
-            --function-name "${{ env.LOADER_LAMBDA_DEV }}" \
-            --payload '{"action":"migrate"}' \
-            --cli-binary-format raw-in-base64-out \
-            --cli-read-timeout 300 \
-            /dev/stdout)
+          --function-name "nbajinni-dev-data-loader" \
+          --payload '{"action":"migrate"}' \
+          --cli-binary-format raw-in-base64-out \
+          --cli-read-timeout 300 \
+          --output json \
+          /tmp/lambda_response.json)
           echo "$RESPONSE"
 
           # Parse JSON and check for errors
           python -c "
-          import json
-          import sys
-          try:
-              response = json.loads(r'''$RESPONSE''')
-              if 'error' in response:
-                  print(f'Lambda returned an error: {response[\"error\"]}')
-                  sys.exit(1)
-              status = response.get('statusCode', 200)
-              if status != 200:
-                  print(f'Lambda returned non-200 status: {status}')
-                  sys.exit(1)
-              print('Loader migration succeeded.')
+          import json, sys
+          with open('/tmp/lambda_response.json') as f:
+              response = json.load(f)
+          if 'error' in response:
+              print(f'Lambda returned an error: {response[\"error\"]}')
+              sys.exit(1)
+          status = response.get('statusCode', 200)
+          if status != 200:
+              print(f'Lambda returned non-200 status: {status}')
+              sys.exit(1)
+          print('Loader migration succeeded.')
           except json.JSONDecodeError as e:
               print(f'Failed to parse Lambda response as JSON: {e}')
               sys.exit(1)
