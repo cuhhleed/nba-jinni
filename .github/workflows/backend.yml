@@ -112,7 +112,7 @@ jobs:
         run: poetry run pytest -v
 
   deploy-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     environment: dev
     concurrency:
@@ -182,8 +182,9 @@ jobs:
   # NOTE: This job will fail at the S3 upload / Lambda update step until
   # infra/environments/prod/ exists and the prod backend Lambda + artifacts
   # bucket are provisioned. See FEATURE-009.
+  # Approval gate is handled by `environment: prod` (Story 7.1 required reviewer).
   deploy-prod:
-    if: github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: prod
     concurrency:
