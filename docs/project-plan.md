@@ -502,11 +502,11 @@ _As a developer, I want Terraform plan run on every PR and apply run on merge to
 
 Tasks:
 
-- [ ] Create `.github/workflows/terraform.yml`
-- [ ] On PR: run `terraform fmt -check`, `terraform validate`, `terraform plan` against `environments/dev` — post plan output as PR comment
-- [ ] On merge to `main`: run `terraform apply -auto-approve` against `environments/dev`
-- [ ] Add a `workflow_dispatch` job for `environments/prod` apply, requiring GitHub Environment approval
-- [ ] Store Terraform state bucket, region, and lock table name as GitHub Actions secrets
+- [x] Create `.github/workflows/terraform.yml`
+- [x] On PR: run `terraform fmt -check`, `terraform validate`, `terraform plan` against `environments/dev` — post plan output as PR comment
+- [x] On merge to `main`: run `terraform apply -auto-approve` against `environments/dev`
+- [x] Add a `workflow_dispatch` job for `environments/prod` apply, requiring GitHub Environment approval
+- [x] Hardcode Terraform state bucket, region, and lock table as workflow-level env vars (not GH secrets — values are public in committed backend.tf; see FEATURE-008). Add DB_USERNAME and DB_PASSWORD manually to dev and prod GitHub Environments.
 
 ---
 

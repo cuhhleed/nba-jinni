@@ -59,6 +59,8 @@ module "oidc_dev" {
   aws_region        = var.aws_region
   account_id        = data.aws_caller_identity.current.account_id
   oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
+  state_bucket      = "nbajinni-terraform-state"
+  lock_table        = "nbajinni-terraform-locks"
 }
 
 module "oidc_prod" {
@@ -70,6 +72,8 @@ module "oidc_prod" {
   aws_region        = var.aws_region
   account_id        = data.aws_caller_identity.current.account_id
   oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
+  state_bucket      = "nbajinni-terraform-state"
+  lock_table        = "nbajinni-terraform-locks"
 }
 
 resource "github_repository_environment" "dev" {
@@ -95,14 +99,14 @@ resource "github_actions_environment_secret" "dev_role_arn" {
   repository      = "nba-jinni"
   environment     = github_repository_environment.dev.environment
   secret_name     = "AWS_ROLE_ARN"
-  value       = module.oidc_dev.role_arn
+  value           = module.oidc_dev.app_role_arn
 }
 
 resource "github_actions_environment_secret" "prod_role_arn" {
   repository  = "nba-jinni"
   environment = github_repository_environment.prod.environment
   secret_name = "AWS_ROLE_ARN"
-  value       = module.oidc_prod.role_arn
+  value       = module.oidc_prod.app_role_arn
 }
 
 resource "github_actions_environment_secret" "dev_region" {
@@ -117,4 +121,18 @@ resource "github_actions_environment_secret" "prod_region" {
   environment = github_repository_environment.prod.environment
   secret_name = "AWS_REGION"
   value       = var.aws_region
+}
+
+resource "github_actions_environment_secret" "tf_role_arn_dev" {
+  repository  = "nba-jinni"
+  environment = github_repository_environment.dev.environment
+  secret_name = "TF_ROLE_ARN"
+  value       = module.oidc_dev.terraform_role_arn
+}
+
+resource "github_actions_environment_secret" "tf_role_arn_prod" {
+  repository  = "nba-jinni"
+  environment = github_repository_environment.prod.environment
+  secret_name = "TF_ROLE_ARN"
+  value       = module.oidc_prod.terraform_role_arn
 }

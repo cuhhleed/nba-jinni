@@ -70,3 +70,20 @@ Go to GitHub → Actions → OIDC Smoke Test → Run workflow. The `verify-dev` 
 Both jobs run `aws sts get-caller-identity`. A successful response shows the assumed role ARN — confirm it matches `nbajinni-<env>-github-actions-role`.
 
 Run this any time OIDC authentication appears broken in a deploy workflow.
+
+## Manual env secrets for Terraform CI (Story 7.2 / FEATURE-008)
+
+The Terraform workflow (`.github/workflows/terraform.yml`) runs `terraform plan` and `terraform apply` against `environments/dev` and `environments/prod`. Terraform consumes `db_username` and `db_password` as sensitive variables via `TF_VAR_db_username` and `TF_VAR_db_password`.
+
+To keep plaintext out of Terraform state, these are NOT managed via the `integrations/github` provider — they must be added manually after running `terraform apply` on this shared environment.
+
+**Setup steps (repeat for each GitHub Environment):**
+
+1. Go to GitHub → Settings → Environments → `dev` → Add secret
+2. Add secret `DB_USERNAME` with the database master username
+3. Add secret `DB_PASSWORD` with the database master password
+4. Repeat for the `prod` environment (proactively, or when `infra/environments/prod/` is created)
+
+The workflow reads these at runtime and passes them to Terraform. They are never written into `.tfstate` or `.tfvars` files.
+
+**Rotation:** If `db_password` is changed, update the `DB_PASSWORD` secret in the GitHub Environment and re-run the relevant apply job. The apply will update the value in AWS Secrets Manager to match.

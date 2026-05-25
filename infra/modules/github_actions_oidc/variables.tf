@@ -27,3 +27,13 @@ variable "oidc_provider_arn" {
   description = "ARN of the GitHub Actions OIDC provider (created at the shared env root)"
   type        = string
 }
+
+variable "state_bucket" {
+  description = "S3 bucket name holding Terraform state; consumed by the TF-CI role's deploy policy"
+  type        = string
+}
+
+variable "lock_table" {
+  description = "DynamoDB table name holding Terraform state locks; consumed by the TF-CI role's deploy policy"
+  type        = string
+}
