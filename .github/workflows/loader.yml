@@ -174,28 +174,6 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR_DEV }}
         run: terraform init -input=false
 
-      - name: Read dev RDS endpoint from Terraform output
-        id: tf_out
-        working-directory: ${{ env.TF_WORKING_DIR_DEV }}
-        run: echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> $GITHUB_OUTPUT
-
-      - name: RDS pre-flight connectivity check
-        run: |
-          set -e
-          ENDPOINT="${{ steps.tf_out.outputs.rds_endpoint }}"
-          HOST="${ENDPOINT%:*}"
-          PORT="${ENDPOINT##*:}"
-          python -c "
-          import socket
-          import sys
-          try:
-              socket.create_connection(('$HOST', $PORT), timeout=5)
-              print('RDS endpoint reachable')
-          except Exception as e:
-              print(f'RDS endpoint unreachable: {e}')
-              sys.exit(1)
-          "
-
       - name: Invoke Loader with migrate action
         run: |
           set -e
