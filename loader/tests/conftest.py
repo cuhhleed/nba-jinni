@@ -78,7 +78,8 @@ def session_factory(mock_session):
     #
     # load() does:
     #   AsyncSessionLocal = get_session_factory()   ← patched to return session_factory
-    #   async with AsyncSessionLocal() as session:  ← session_factory() must be an async CM
+    #   async with AsyncSessionLocal() as session:  ← session_factory() must be an async
+    #   CM
     #
     # So session_factory itself must be the thing load() calls directly.
     # get_session_factory is patched with return_value=session_factory, meaning
