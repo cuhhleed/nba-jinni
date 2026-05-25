@@ -180,6 +180,7 @@ jobs:
           RESPONSE=$(aws lambda invoke \
             --function-name "${{ env.LOADER_LAMBDA_DEV }}" \
             --payload '{"action":"migrate"}' \
+            --cli-binary-format raw-in-base64-out \
             --cli-read-timeout 300 \
             /dev/stdout)
           echo "$RESPONSE"
