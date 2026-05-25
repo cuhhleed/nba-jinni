@@ -530,15 +530,15 @@ _As a developer, I want the Loader Lambda automatically deployed and its `migrat
 
 Tasks:
 
-- [ ] Create `.github/workflows/loader.yml`
-- [ ] On PR: lint + unit-test `loader/`, run the schema-amendment lint (Story 7.5)
-- [ ] On merge to `main`, against dev:
-  - [ ] Build Loader zip via `scripts/package_loader.sh` (bundles `/shared`, Alembic, migrations) [ADR-005]
-  - [ ] Deploy via `aws lambda update-function-code` to the dev Loader Lambda
-  - [ ] Pre-flight: `aws rds describe-db-instances` to confirm reachability
-  - [ ] Invoke Loader with `{"action":"migrate"}`; fail the workflow if the Lambda returns non-200 or surfaces a migration error
-- [ ] Add a `workflow_dispatch` job that repeats the above sequence for prod (manual gate)
-- [ ] Store dev and prod Loader Lambda function names as GitHub Actions secrets
+- [x] Create `.github/workflows/loader.yml`
+- [x] On PR: lint + unit-test `loader/`, run the schema-amendment lint (Story 7.5)
+- [x] On merge to `main`, against dev:
+  - [x] Build Loader zip via `scripts/package_loader.sh` (bundles `/shared`, Alembic, migrations) [ADR-005]
+  - [x] Deploy via `aws lambda update-function-code` to the dev Loader Lambda
+  - [x] Pre-flight: RDS reachability check via socket connectivity test
+  - [x] Invoke Loader with `{"action":"migrate"}`; fail the workflow if the Lambda returns non-200 or surfaces a migration error
+- [x] Add a `workflow_dispatch` job that repeats the above sequence for prod (manual gate)
+- [x] Hardcode dev and prod Loader Lambda function names as workflow-level env vars (not GH secrets — values are deterministic public strings; see FEATURE-011)
 
 ---
 
