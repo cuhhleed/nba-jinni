@@ -414,3 +414,70 @@ Whether to introduce the helper or stick with the two-line inline pattern is a s
 - [ ] Add a brief note to `docs/ARCHITECTURE_DECISIONS.md` ADR-005 (or as a new ADR) acknowledging that schema amendments to populated tables follow this workflow, leveraging the loader's migrate-then-load flow
 
 ---
+
+## FEATURE-008 — Terraform CI Workflow with Dedicated TF-CI IAM Roles
+
+### Status
+
+PROPOSED
+
+### Background
+
+Story 7.1 (ADR-010) established OIDC-based AWS authentication with per-environment GitHub Environments (`dev`, `prod`) and tightly scoped app-deploy roles (`nbajinni-<env>-github-actions-role`). Those roles are limited to the operations needed for shipping application code: Lambda update, S3 sync, CloudFront invalidate, and Secrets Manager read. They intentionally exclude IAM management and Terraform state permissions to minimize blast radius.
+
+Story 7.2 needs to run Terraform itself in CI. That requires different, broader permissions that are inappropriate to bolt onto the existing app-deploy roles.
+
+### Problem
+
+- `nbajinni-<env>-github-actions-role` lacks IAM, state-bucket, and lock-table permissions — it cannot run `terraform apply`
+- Granting those permissions to the app-deploy role inflates blast radius for every workflow that uses it
+- The original Story 7.2 task "store state bucket / region / lock table as GH secrets" does not fit the OIDC model — these values are already public in committed `backend.tf` and are not credentials
+- `db_username` / `db_password` are sensitive variables that Terraform consumes at apply time — they must reach CI without being stored as plaintext in Terraform state (chicken-and-egg: Terraform cannot manage the secret it needs to run)
+
+### Constraints
+
+- OIDC trust pattern must match ADR-010 (`repo:cuhhleed/nba-jinni:environment:<env>` sub claim)
+- New IAM resources must live in `infra/environments/shared/` (account-wide CI bootstrap, separate from app env state)
+- Module shape: both per-env roles (app-deploy + TF-CI) are encapsulated in the existing `github_actions_oidc` module, extended in place — no new module introduced
+- Sensitive variables that Terraform consumes must not be Terraform-managed (plaintext-in-state avoidance)
+
+### Proposed Solution
+
+1. Second OIDC-trusted IAM role per environment: `nbajinni-<env>-terraform-ci-role`. Uses the same `github_oidc_trust_policy.json.tpl` (same `sub` claim format), separate deploy policy.
+
+2. Provisioned inside the existing `github_actions_oidc` module (extended with `state_bucket` and `lock_table` inputs) so a single module call per environment creates both roles. Module outputs renamed for clarity: `role_arn` → `app_role_arn`, `role_name` → `app_role_name`; new outputs `terraform_role_arn`, `terraform_role_name`.
+
+3. Policy composition for the TF-CI role: AWS-managed `PowerUserAccess` (covers all non-IAM service actions needed by Terraform) plus a custom policy (`github_oidc_terraform_policy.json.tpl`) granting IAM CRUD scoped to `nbajinni-<env>-*` resources, OIDC provider read (account-level), S3 state-prefix CRUD, and DynamoDB lock-table CRUD.
+
+4. New environment-scoped GitHub Actions secret `TF_ROLE_ARN` (distinct from `AWS_ROLE_ARN`) — Terraform-managed via the same `integrations/github` provider used in Story 7.1.
+
+5. Workflow `.github/workflows/terraform.yml` with three jobs:
+   - `plan` — runs on PRs touching `infra/**`; runs `fmt -check`, `validate`, `plan` against `environments/dev`; posts a single auto-updating collapsible PR comment (marker `<!-- terraform-plan-dev -->`)
+   - `apply-dev` — runs on push to `main`; runs `terraform apply -auto-approve` against `environments/dev`
+   - `apply-prod` — runs on `workflow_dispatch`; statically bound to `environment: prod` for the GitHub approval gate; runs against `environments/prod` (will fail until that directory exists)
+   State bucket, region, and lock table are hardcoded in the workflow-level `env:` block — not stored as GH secrets because the values are already public in committed `backend.tf`.
+
+6. `DB_USERNAME` / `DB_PASSWORD` added manually to each GitHub Environment by the operator (one-time setup after `terraform apply` on `infra/environments/shared/`); workflow passes them via `TF_VAR_db_username` / `TF_VAR_db_password`. Plaintext never enters Terraform state.
+
+7. PR comment uses `actions/github-script@v7` with marker-based update-or-create so repeated pushes to the same PR update one comment, not spam.
+
+### Watch Points
+
+- `apply-prod` will fail at `terraform init` until `infra/environments/prod/` exists — planned in a future story. Failure is expected and documented inline in the workflow file.
+- `PowerUserAccess` is an AWS-managed policy; AWS may update its action set. If a future Terraform resource requires an IAM action not covered by the custom policy, the failure mode is a clear permissions error on `apply`.
+- DB secrets in the GitHub UI are point-in-time. If `db_password` is rotated locally, the relevant `apply` job must be re-run to propagate the change to AWS Secrets Manager.
+- Never run `terraform init -upgrade` in CI — the `.terraform.lock.hcl` lockfile pins provider versions and must stay in sync with local development.
+
+### Tasks
+
+- [x] Extend `infra/modules/github_actions_oidc/` with TF-CI role, policy, and attachments
+- [x] Rename module outputs `role_arn` → `app_role_arn`, `role_name` → `app_role_name`; add `terraform_role_arn`, `terraform_role_name`
+- [x] Update `infra/environments/shared/main.tf` module calls and secret resources
+- [x] Add `TF_ROLE_ARN` secrets to `infra/environments/shared/main.tf`
+- [x] Expose TF role ARNs in `infra/environments/shared/outputs.tf`
+- [x] Create `.github/workflows/terraform.yml`
+- [ ] Run `terraform apply` on `infra/environments/shared/` to create new AWS resources and GH secrets
+- [ ] Manually add `DB_USERNAME` and `DB_PASSWORD` to the `dev` (and `prod`) GitHub Environments
+- [ ] Verify end-to-end per the Story 7.2 verification checklist
+
+---

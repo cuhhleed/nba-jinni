@@ -247,7 +247,8 @@ module "lambda_loader" {
   project_name       = var.project_name
   environment        = var.environment
   function_name      = "data-loader"
-  filename           = "../../loader.zip"
+  s3_bucket          = module.s3_lambda_artifacts.bucket_id
+  s3_key             = "loader.zip"
   role               = aws_iam_role.lambda_exec.arn
   handler            = "main.handler"
   timeout            = 300
