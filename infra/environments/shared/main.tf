@@ -96,10 +96,10 @@ resource "github_repository_environment" "prod" {
 }
 
 resource "github_actions_environment_secret" "dev_role_arn" {
-  repository      = "nba-jinni"
-  environment     = github_repository_environment.dev.environment
-  secret_name     = "AWS_ROLE_ARN"
-  value           = module.oidc_dev.app_role_arn
+  repository  = "nba-jinni"
+  environment = github_repository_environment.dev.environment
+  secret_name = "AWS_ROLE_ARN"
+  value       = module.oidc_dev.app_role_arn
 }
 
 resource "github_actions_environment_secret" "prod_role_arn" {
