@@ -518,8 +518,8 @@ Tasks:
 - [x] Create `.github/workflows/backend.yml`
 - [x] On PR: run `flake8`, `black --check`, and `pytest backend/`
 - [x] Verify the backend Lambda zip bundles `/shared` [ADR-001] and the `nba_api` runtime dependency [ADR-007]
-- [x] On merge to `main`: package backend Lambda zip, deploy to dev Lambda via `aws lambda update-function-code`, then run smoke test (`curl $DEV_API/health`, fail if non-200)
-- [x] Add a `workflow_dispatch` job that promotes the same zip to the prod Lambda (manual gate via the `prod` GitHub Environment approval; alias deferred — see FEATURE-009)
+- [x] On PR opened/synced against `main`: package backend Lambda zip, deploy to dev Lambda via `aws lambda update-function-code`, then run smoke test (`curl $DEV_API/health`, fail if non-200) — preview-deploy pattern from `terraform.yml`
+- [x] On merge to `main` (or `workflow_dispatch`): promote the same zip to the prod Lambda, gated by the `prod` GitHub Environment approval; alias deferred — see FEATURE-009
 - [x] Hardcode dev and prod backend Lambda function names as workflow-level env vars (not GH secrets — values are deterministic public strings; see FEATURE-009)
 - [x] Note: schema migrations are owned by the Loader Lambda (Story 7.4); backend CI must NOT run `alembic upgrade head` [ADR-005]
 

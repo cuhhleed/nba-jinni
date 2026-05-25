@@ -508,7 +508,7 @@ Story 7.1 (ADR-010) established OIDC + per-environment app-deploy IAM roles. Sto
 
 ### Proposed Solution
 
-1. New workflow `.github/workflows/backend.yml` with three jobs: `pr-checks` (PR-only lint + pytest against Postgres service container), `deploy-dev` (push to `main`), `deploy-prod` (`workflow_dispatch`, gated by the prod GitHub Environment approval from Story 7.1).
+1. New workflow `.github/workflows/backend.yml` with three jobs: `pr-checks` (lint + pytest against Postgres service container, runs on every PR), `deploy-dev` (fires on `pull_request` events whose base is `main` — every push to the PR branch redeploys to dev as a preview, mirroring `terraform.yml`'s `apply-dev` pattern), `deploy-prod` (fires on `push` to `main` after PR merge, or on `workflow_dispatch`; gated by the prod GitHub Environment approval from Story 7.1).
 
 2. Backend Lambda function names hardcoded in the workflow-level `env:` block (`BACKEND_LAMBDA_DEV: nbajinni-dev-request-handler`, `BACKEND_LAMBDA_PROD: nbajinni-prod-request-handler`) — not stored as GH secrets. Same rationale as FEATURE-008's state-bucket rewrite: deterministic public values do not belong in a secret store. The original Story 7.3 task is rewritten to reflect this.
 
