@@ -481,3 +481,62 @@ Story 7.2 needs to run Terraform itself in CI. That requires different, broader 
 - [ ] Verify end-to-end per the Story 7.2 verification checklist
 
 ---
+
+## FEATURE-009 — Backend Lambda CI/CD Workflow with Schema-Bootstrap Carve-Out
+
+### Status
+
+PROPOSED
+
+### Background
+
+Story 7.1 (ADR-010) established OIDC + per-environment app-deploy IAM roles. Story 7.2 (FEATURE-008) added Terraform CI on top of that. Story 7.3 adds the third leg: a PR-test + dev-deploy + prod-promote pipeline for the backend FastAPI Lambda (handler `app.main.handler`, Mangum-wrapped, deployed to `nbajinni-<env>-request-handler`).
+
+### Problem
+
+- The Story 7.3 task line "promote the same zip to the prod Lambda alias" presupposes an `aws_lambda_alias` resource. The repo has zero `aws_lambda_alias` resources today; nothing in `infra/modules/lambda/` provisions one.
+- The task line "store backend Lambda function names as GitHub Actions secrets" puts deterministic non-secret values (`nbajinni-<env>-request-handler`) into a secret store — the same dissonance FEATURE-008 addressed for state bucket / region / lock table.
+- Backend tests in `backend/tests/conftest.py` require a real Postgres (transaction-rollback isolation per test) and read `TEST_DATABASE_URL` from env. `conftest.py` does NOT bootstrap the schema, so the CI test DB starts empty. ADR-005 forbids backend CI from running `alembic upgrade head`, but ADR-005's scope is *deploy-to-RDS migrations* (owned by the Loader Lambda), not *ephemeral CI test DB setup*.
+- The backend zip bundles `nba_api` (ADR-007) which pulls in pandas + numpy. The resulting artifact is likely past the ~50 MB inline `update-function-code` limit.
+
+### Constraints
+
+- OIDC trust pattern must match ADR-010 (`environment:` declaration is mandatory on every deploy job — sub-claim gate).
+- App-deploy role permissions must not be expanded (per Story 7.1 / ADR-010 minimal-scope decision). Phase-1 IAM audit confirmed the existing role already grants `lambda:UpdateFunctionCode`, `lambda:GetFunction`, `lambda:InvokeFunction` scoped to `nbajinni-<env>-*` and `s3:PutObject` to the lambda-artifacts bucket — sufficient.
+- Cannot run Alembic in backend CI (ADR-005).
+- Cannot alter the existing `scripts/package_backend.sh` bundle contents (ADR-001 + ADR-007 prescribe what goes in the zip).
+
+### Proposed Solution
+
+1. New workflow `.github/workflows/backend.yml` with three jobs: `pr-checks` (PR-only lint + pytest against Postgres service container), `deploy-dev` (push to `main`), `deploy-prod` (`workflow_dispatch`, gated by the prod GitHub Environment approval from Story 7.1).
+
+2. Backend Lambda function names hardcoded in the workflow-level `env:` block (`BACKEND_LAMBDA_DEV: nbajinni-dev-request-handler`, `BACKEND_LAMBDA_PROD: nbajinni-prod-request-handler`) — not stored as GH secrets. Same rationale as FEATURE-008's state-bucket rewrite: deterministic public values do not belong in a secret store. The original Story 7.3 task is rewritten to reflect this.
+
+3. No Lambda alias. The prod-promote job runs `aws lambda update-function-code` directly against `nbajinni-prod-request-handler`. Blue/green / canary strategy is deferred to a future story; the watch-point below records the trade-off (no atomic rollback).
+
+4. Zip is staged through `s3://nbajinni-<env>-lambda-artifacts/backend.zip`, then deployed via `aws lambda update-function-code --s3-bucket / --s3-key` (handles zips larger than the inline limit). Mirrors how `terraform.yml` stages `loader.zip`.
+
+5. PR pytest job uses a Postgres 16 service container with `pg_isready` healthcheck. Schema is bootstrapped via a one-shot Python step that imports every `nbajinni_shared.models.*` module and calls `Base.metadata.create_all()` against `TEST_DATABASE_URL`. **This is the documented carve-out from ADR-005:** ADR-005 governs deploy-to-RDS migrations (where the Loader Lambda owns Alembic and is the only path that touches the dev/prod databases). Ephemeral CI test DBs are out of that ADR's scope — they need a schema to exist somehow, and `create_all()` avoids dragging Alembic into the backend's dep set. Recorded here so a future reader does not mistake it for ADR drift.
+
+6. Smoke test via `curl -sf` against `GET /health`, with the API URL read from `terraform output -raw api_gateway_url` (mirrors the `frontend.yml` pattern of running `terraform init` purely to read state). Three retries with 5 s sleep between to cover Lambda cold-start latency.
+
+7. Workflow asserts the zip bundles both `nbajinni_shared/` and `nba_api/` (via `unzip -l | grep -q`) before staging — ADR-001 + ADR-007 enforcement at CI time, not just docs.
+
+### Watch Points
+
+- `deploy-prod` will fail until `infra/environments/prod/` exists AND `nbajinni-prod-request-handler` Lambda + `nbajinni-prod-lambda-artifacts` bucket are provisioned. Documented inline in the workflow; matches Story 7.2's `apply-prod` wire-but-fail shape.
+- No Lambda alias = no atomic rollback. If a bad deploy reaches prod, mitigation is re-deploy from a previous commit, not an alias flip. Revisit when prod traffic justifies blue/green.
+- The schema-bootstrap step is fragile against new model additions: a new `nbajinni_shared.models.<x>.py` requires updating the import block in `backend.yml`, or `create_all()` will silently skip that model's table. Acceptable trade-off — explicit imports are grep-friendly and the failure mode is clear (test fails on missing table).
+- Poetry version is pinned in the workflow (`pipx install poetry==1.8.3`); bump in sync with local dev.
+
+### Tasks
+
+- [x] Create `.github/workflows/backend.yml` with `pr-checks`, `deploy-dev`, `deploy-prod` jobs
+- [x] Hardcode backend Lambda function names + artifacts bucket names in workflow `env:` (no GH secrets for these)
+- [x] Add Postgres 16 service container and schema-bootstrap step for PR tests
+- [x] Add zip content assertion (`/shared` + `nba_api`) before deploy
+- [x] Update `docs/project-plan.md` Story 7.3 task checkboxes (rewrite the "store function names as secrets" line)
+- [ ] Verify end-to-end: trivial backend PR exercises `pr-checks`, merge to main exercises `deploy-dev`, `workflow_dispatch` exercises `deploy-prod` (expected to fail until prod env exists)
+- [ ] After prod env exists in a future story, manually run `Actions → Backend CI → Run workflow` to confirm prod path and flip this FEATURE to IMPLEMENTED
+
+---

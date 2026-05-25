@@ -1,0 +1,249 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'shared/**'
+      - 'scripts/package_backend.sh'
+      - '.github/workflows/backend.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'shared/**'
+      - 'scripts/package_backend.sh'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: '3.12'
+  TF_VERSION: 1.10.0
+  TF_WORKING_DIR_DEV: infra/environments/dev
+  TF_WORKING_DIR_PROD: infra/environments/prod
+  BACKEND_LAMBDA_DEV: nbajinni-dev-request-handler
+  BACKEND_LAMBDA_PROD: nbajinni-prod-request-handler
+  LAMBDA_ARTIFACTS_BUCKET_DEV: nbajinni-dev-lambda-artifacts
+  LAMBDA_ARTIFACTS_BUCKET_PROD: nbajinni-prod-lambda-artifacts
+
+jobs:
+  pr-checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nbajinni_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: poetry install --no-interaction --no-root
+
+      - name: Lint with flake8
+        working-directory: backend
+        run: poetry run flake8 .
+
+      - name: Lint with black
+        working-directory: backend
+        run: poetry run black --check .
+
+      - name: Bootstrap test schema (Base.metadata.create_all, not Alembic per ADR-005)
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
+        run: |
+          poetry run python -c "
+          import asyncio, os
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from nbajinni_shared.base import Base
+          import nbajinni_shared.models.teams
+          import nbajinni_shared.models.players
+          import nbajinni_shared.models.games
+          import nbajinni_shared.models.seasons
+          import nbajinni_shared.models.standings
+          import nbajinni_shared.models.player_game_stats
+          import nbajinni_shared.models.team_game_stats
+          import nbajinni_shared.models.player_season_averages
+          import nbajinni_shared.models.team_season_averages
+          import nbajinni_shared.models.users
+          async def main():
+              engine = create_async_engine(os.environ['TEST_DATABASE_URL'])
+              async with engine.begin() as conn:
+                  await conn.run_sync(Base.metadata.create_all)
+              await engine.dispose()
+          asyncio.run(main())
+          "
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/nbajinni_test
+        run: poetry run pytest -v
+
+  deploy-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: backend-deploy-dev
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Build backend.zip
+        run: bash scripts/package_backend.sh
+
+      - name: Assert zip bundles /shared (ADR-001) and nba_api (ADR-007)
+        run: |
+          set -e
+          unzip -l infra/backend.zip | grep -q 'nbajinni_shared/' || { echo "FAIL: /shared not bundled (ADR-001)"; exit 1; }
+          unzip -l infra/backend.zip | grep -q 'nba_api/'        || { echo "FAIL: nba_api not bundled (ADR-007)"; exit 1; }
+          echo "Zip content assertions passed."
+
+      - name: Stage zip to S3
+        run: aws s3 cp infra/backend.zip s3://${{ env.LAMBDA_ARTIFACTS_BUCKET_DEV }}/backend.zip
+
+      - name: Deploy Lambda
+        run: aws lambda update-function-code --function-name "${{ env.BACKEND_LAMBDA_DEV }}" --s3-bucket "${{ env.LAMBDA_ARTIFACTS_BUCKET_DEV }}" --s3-key backend.zip --publish
+
+      - name: Wait for Lambda update to settle
+        run: aws lambda wait function-updated-v2 --function-name "${{ env.BACKEND_LAMBDA_DEV }}"
+
+      - name: Terraform init (for output read)
+        working-directory: ${{ env.TF_WORKING_DIR_DEV }}
+        run: terraform init -input=false
+
+      - name: Read dev API URL from Terraform output
+        id: tf_out
+        working-directory: ${{ env.TF_WORKING_DIR_DEV }}
+        run: echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+
+      - name: Smoke test /health
+        run: |
+          set -e
+          API_URL="${{ steps.tf_out.outputs.api_url }}"
+          URL="${API_URL%/}/health"
+          for i in 1 2 3; do
+            echo "Attempt $i: curl -sf $URL"
+            if curl -sf "$URL"; then
+              echo "Smoke test passed."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Smoke test failed after 3 attempts."
+          exit 1
+
+  # NOTE: This job will fail at the S3 upload / Lambda update step until
+  # infra/environments/prod/ exists and the prod backend Lambda + artifacts
+  # bucket are provisioned. See FEATURE-009.
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: backend-deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Build backend.zip
+        run: bash scripts/package_backend.sh
+
+      - name: Assert zip bundles /shared (ADR-001) and nba_api (ADR-007)
+        run: |
+          set -e
+          unzip -l infra/backend.zip | grep -q 'nbajinni_shared/' || { echo "FAIL: /shared not bundled (ADR-001)"; exit 1; }
+          unzip -l infra/backend.zip | grep -q 'nba_api/'        || { echo "FAIL: nba_api not bundled (ADR-007)"; exit 1; }
+          echo "Zip content assertions passed."
+
+      - name: Stage zip to S3
+        run: aws s3 cp infra/backend.zip s3://${{ env.LAMBDA_ARTIFACTS_BUCKET_PROD }}/backend.zip
+
+      - name: Deploy Lambda
+        run: aws lambda update-function-code --function-name "${{ env.BACKEND_LAMBDA_PROD }}" --s3-bucket "${{ env.LAMBDA_ARTIFACTS_BUCKET_PROD }}" --s3-key backend.zip --publish
+
+      - name: Wait for Lambda update to settle
+        run: aws lambda wait function-updated-v2 --function-name "${{ env.BACKEND_LAMBDA_PROD }}"
+
+      - name: Terraform init (for output read)
+        working-directory: ${{ env.TF_WORKING_DIR_PROD }}
+        run: terraform init -input=false
+
+      - name: Read prod API URL from Terraform output
+        id: tf_out
+        working-directory: ${{ env.TF_WORKING_DIR_PROD }}
+        run: echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+
+      - name: Smoke test /health
+        run: |
+          set -e
+          API_URL="${{ steps.tf_out.outputs.api_url }}"
+          URL="${API_URL%/}/health"
+          for i in 1 2 3; do
+            echo "Attempt $i: curl -sf $URL"
+            if curl -sf "$URL"; then
+              echo "Smoke test passed."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Smoke test failed after 3 attempts."
+          exit 1
