@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePlayerVsOpponent } from "../../hooks/usePlayerVsOpponent";
 import { useTeamSchedule } from "../../hooks/useTeamSchedule";
 import { useTeams } from "../../hooks/useTeams";
@@ -12,25 +12,20 @@ type Props = { player: PlayerDetail };
 
 export default function VsTeamTab({ player }: Props) {
   const teamId = player.team.id;
-  const [selectedTeamId, setSelectedTeamId] = useState(0);
+  const [userSelectedTeamId, setUserSelectedTeamId] = useState<number | null>(null);
 
   const { data: schedule } = useTeamSchedule(teamId);
   const { data: allTeams } = useTeams();
-  const { data: games, isLoading, error } = usePlayerVsOpponent(player.id, selectedTeamId);
 
-  useEffect(() => {
-    if (selectedTeamId !== 0 || !schedule) return;
-    const { upcoming, recent } = schedule;
-    let defaultOpp = 0;
-    if (upcoming.length > 0) {
-      const g = upcoming[0];
-      defaultOpp = g.home_team_id !== teamId ? g.home_team_id : g.away_team_id;
-    } else if (recent.length > 0) {
-      const g = recent[0];
-      defaultOpp = g.home_team_id !== teamId ? g.home_team_id : g.away_team_id;
-    }
-    if (defaultOpp > 0) setSelectedTeamId(defaultOpp);
-  }, [schedule, teamId, selectedTeamId]);
+  const defaultOpponentId = useMemo(() => {
+    if (!schedule) return 0;
+    const g = schedule.upcoming[0] ?? schedule.recent[0];
+    if (!g) return 0;
+    return g.home_team_id !== teamId ? g.home_team_id : g.away_team_id;
+  }, [schedule, teamId]);
+
+  const selectedTeamId = userSelectedTeamId ?? defaultOpponentId;
+  const { data: games, isLoading, error } = usePlayerVsOpponent(player.id, selectedTeamId);
 
   const otherTeams = (allTeams ?? [])
     .filter((t) => t.id !== teamId)
@@ -43,7 +38,7 @@ export default function VsTeamTab({ player }: Props) {
       <div className="flex justify-center mt-2">
         <select
           value={selectedTeamId}
-          onChange={(e) => setSelectedTeamId(Number(e.target.value))}
+          onChange={(e) => setUserSelectedTeamId(Number(e.target.value))}
           className="border border-amber-500 rounded px-2 py-1 text-sm text-gray-900 bg-white"
         >
           <option value={0} disabled>

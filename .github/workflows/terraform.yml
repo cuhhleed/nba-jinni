@@ -135,7 +135,7 @@ jobs:
         run: exit 1
 
   apply-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     environment: dev
     concurrency:
@@ -184,9 +184,10 @@ jobs:
       - name: Terraform output
         run: terraform output -no-color
 
+  # Fires on merge to main (push event) OR manual workflow_dispatch as a fallback.
   # NOTE: This job will fail at terraform init until infra/environments/prod/ exists. See FEATURE-008 / Story 7.2 plan.
   apply-prod:
-    if: github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: prod
     concurrency:
