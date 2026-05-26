@@ -12,3 +12,8 @@ output "port" {
   description = "Port the RDS instance is listening on"
   value       = aws_db_instance.main.port
 }
+
+output "instance_identifier" {
+  description = "RDS instance identifier; required as a dimension on CloudWatch metrics like DatabaseConnections."
+  value       = aws_db_instance.main.identifier
+}

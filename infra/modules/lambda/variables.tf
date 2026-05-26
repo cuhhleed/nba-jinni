@@ -86,3 +86,9 @@ variable "replace_security_groups_on_destroy" {
   type        = bool
   default     = true
 }
+
+variable "log_retention_days" {
+  description = "CloudWatch log retention in days for this Lambda's log group."
+  type        = number
+  default     = 14
+}

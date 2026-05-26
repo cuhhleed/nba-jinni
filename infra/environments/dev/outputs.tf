@@ -42,3 +42,18 @@ output "cloudfront_domain" {
   description = "CloudFront domain for the deployed frontend."
   value       = module.cloudfront_frontend.domain_name
 }
+
+output "rds_instance_identifier" {
+  description = "Identifier of the RDS instance; used as a CloudWatch metric dimension."
+  value       = module.rds.instance_identifier
+}
+
+output "alerts_dashboard_name" {
+  description = "Name of the CloudWatch dashboard for this environment."
+  value       = module.observability.dashboard_name
+}
+
+output "alerts_sns_topic_arn" {
+  description = "ARN of the SNS topic that receives alarm notifications."
+  value       = module.observability.sns_topic_arn
+}

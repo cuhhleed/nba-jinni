@@ -652,3 +652,63 @@ Story 7.1 (ADR-010) established OIDC + app-deploy IAM roles. Stories 7.2 and 7.3
 - [ ] After prod env exists in a future story, manually run `Actions → Loader CI → Run workflow` to confirm prod path and flip this FEATURE to IMPLEMENTED
 
 ---
+
+## FEATURE-012 — Observability Provisioning (Log Groups, Alarms, SNS, Dashboard)
+
+### Status
+
+PROPOSED
+
+### Background
+
+Story 7.1 (ADR-010) established OIDC + per-env IAM roles. Stories 7.2–7.6 wired Terraform, backend, Loader, schema-lint, and frontend CI. Story 7.7 closes the operational feedback loop: log retention, alarms, alert routing, and a single-pane dashboard. **No new GitHub workflow** — Story 7.2's `terraform.yml` deploys the new resources alongside the rest of `environments/dev`. While auditing the existing state, a latent bug was found in the `lambda` module (log group named to a non-emission target) and is fixed in the same PR.
+
+### Problem
+
+1. `aws_cloudwatch_log_group` in `modules/lambda/main.tf` is named `/aws/lambda/${var.function_name}-logs` (e.g. `/aws/lambda/request-handler-logs`), but the Lambda function name is `${var.project_name}-${var.environment}-${var.function_name}` (e.g. `nbajinni-dev-request-handler`). Lambda's default log group is `/aws/lambda/<full_function_name>`. The Terraform-managed log group is orphaned with no log streams; the actual log group is AWS-auto-created with no retention policy. Story 7.7's "log groups with retention policies" deliverable cannot be met without fixing this.
+2. There is no alarm path — Lambda errors, slow responses, RDS connection saturation, and Loader failures are invisible until a human opens the CloudWatch console.
+3. There is no alert routing — even with alarms, there's nowhere for them to fire to.
+4. There is no single-pane dashboard — debug context is spread across Lambda Insights, RDS Performance Insights, CloudFront monitoring, and per-Lambda log groups.
+5. The Loader Lambda has no machine-readable "last successful run" signal beyond Invocations − Errors metric math (which can't distinguish a successful `load` from a no-op `migrate`).
+
+### Constraints
+
+- Must deploy via existing `terraform.yml` (Story 7.2 / FEATURE-008) — no new workflow file.
+- Must not expand the TF-CI IAM role's permissions. Verified `PowerUserAccess` covers all CloudWatch + SNS actions.
+- Sensitive `alert_email` must follow the same handling pattern as `db_username` / `db_password` (manual GitHub env secret, never in Terraform state).
+- Log group rename forces destroy+recreate. AWS-side auto-created log group must be `terraform import`-ed to avoid `AlreadyExistsException` on apply.
+- SNS email subscriptions cannot be auto-confirmed — operator must click the AWS-sent link.
+
+### Proposed Solution
+
+1. Rename `aws_cloudwatch_log_group.lambda_log` in `modules/lambda/main.tf` to `/aws/lambda/${var.project_name}-${var.environment}-${var.function_name}`. Add `log_retention_days` variable (default 14). Override to 30 days for `module.lambda_loader`.
+2. New `infra/modules/observability/` module: SNS topic + email subscription, four CloudWatch alarms (backend error rate via metric math, backend duration p99, Loader failure, RDS connection saturation), one log metric filter for Loader success, one dashboard.
+3. Expose `aws_db_instance.main.identifier` as a new RDS module output (required for the `DatabaseConnections` metric dimension).
+4. Re-export the dashboard name and SNS topic ARN at `environments/dev/outputs.tf` for operator visibility after apply.
+5. New `alert_email` variable in `environments/dev/variables.tf`, passed via `TF_VAR_alert_email` from a manually-set GitHub Environment secret `ALERT_EMAIL`.
+6. Loader Lambda emits one log line `"Loader run complete"` on successful exit; the log metric filter publishes `LoaderRunSuccess` to namespace `NBAJinni/Loader`.
+7. State reconciliation (one-time, per env): `terraform state rm` the orphaned log group, `terraform import` the AWS-auto-created log group at its new module address.
+
+### Watch Points
+
+- The log group rename is destructive at the state level (forces `replace`) and at the AWS level it requires `terraform import` to avoid `AlreadyExistsException`. Documented in Story 7.7's Open Items.
+- Email subscription stays in `PendingConfirmation` until the operator clicks the confirmation link. Alerts fired before confirmation are silently dropped (AWS does NOT queue them). After confirmation, the operator should manually trigger one alarm to verify end-to-end delivery.
+- `cloudfront_distribution_id` is passed by the observability module to the dashboard widget, but the CloudFront 5xx metric must be queried against `us-east-1` regardless of `var.aws_region` — hardcoded in Widget 3.
+- The `LoaderRunSuccess` metric depends on the exact log substring `"Loader run complete"`. If Loader's logging format changes, the dashboard widget goes silent — no alarm fires, but the dashboard becomes misleading. Mitigated by the `# CloudWatch dashboard signal — do not rename` comment next to the log line in `loader/main.py`.
+- `PowerUserAccess` is a managed policy. AWS could in theory remove a CloudWatch/SNS action from it; if a future apply fails with `AccessDenied`, the custom policy (`infra/policies/github_oidc_terraform_policy.json.tpl`) may need a targeted addition.
+
+### Tasks
+
+- [x] Rename log group in `infra/modules/lambda/main.tf`; add `log_retention_days` variable
+- [x] Add `instance_identifier` output to `infra/modules/rds/outputs.tf`
+- [x] Create `infra/modules/observability/` (variables.tf, main.tf, outputs.tf)
+- [x] Wire module into `infra/environments/dev/main.tf`; override loader retention to 30; re-export outputs
+- [x] Add `alert_email` variable to `infra/environments/dev/variables.tf` (and `.tfvars.example`)
+- [x] Emit `"Loader run complete"` log line in `loader/main.py`
+- [x] Append `TF_VAR_alert_email` to all job env blocks in `.github/workflows/terraform.yml`
+- [x] Extend `infra/environments/shared/README.md` manual-secrets section to include `ALERT_EMAIL`
+- [ ] Operator: set `ALERT_EMAIL` secret on dev (and prod, proactively) GitHub Environments
+- [ ] Operator: pre-apply state reconciliation (`terraform state rm` + `terraform import` for log groups)
+- [ ] Verify end-to-end: apply, click email confirmation, trigger a test alarm
+
+---
