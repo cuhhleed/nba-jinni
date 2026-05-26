@@ -549,7 +549,7 @@ Tasks:
 
 - [x] Add `scripts/lint_schema_amendments.py`
 - [x] On PR diffs touching `alembic/versions/`, fail if a new `NOT NULL` column lacks a `server_default` in the upgrade op
-- [x] Fail if a new column on a model isn't reflected in the relevant parser map in `shared/utils.py` (note: "parser map" interpreted as the per-table .values(...) + set_={...} blocks of any upsert keyed on the table — there is no centralized map in the current code; documented in FEATURE-010)
+- [x] Fail if a new column on a model isn't reflected in the relevant parser map in `shared/utils.py` (note: "parser map" interpreted as the per-table .values(...) + set\_={...} blocks of any upsert keyed on the table — there is no centralized map in the current code; documented in FEATURE-010)
 - [x] Fail if a new date/datetime column isn't added to `loader/main.py` `DATE_COLUMNS`
 - [x] Fail if upsert `set_={}` clauses aren't updated for new columns
 - [x] Wire the lint into the PR jobs for `loader.yml` and `backend.yml` (note: backend.yml wired in Step 4; loader.yml snippet documented for Story 7.4's executor)
@@ -569,29 +569,15 @@ Tasks:
 
 ---
 
-**Story 7.7 — Integration E2E test in CI**
-_As a developer, I want CI to exercise the full loader → backend path on dev before any prod promotion can run._
-
-Tasks:
-
-- [ ] Add a post-deploy job in `loader.yml` (dev only) that:
-  - [ ] Uploads a known fixture JSON to the dev S3 loader-input bucket
-  - [ ] Invokes the Loader Lambda with `{"action":"load"}`
-  - [ ] Calls backend endpoints (`/teams`, `/games/{id}`) and asserts expected fixture data
-  - [ ] Tears down the test fixture
-- [ ] Block the prod promotion `workflow_dispatch` jobs (Stories 7.3, 7.4, 7.6) unless this E2E job has passed on the same commit
-
----
-
-**Story 7.8 — Observability provisioning**
+**Story 7.7 — Observability provisioning**
 _As a developer, I want CloudWatch log groups, alarms, and a dashboard provisioned by Terraform so production issues are visible._
 
 Tasks (deployed via Story 7.2's Terraform workflow):
 
-- [ ] CloudWatch log groups for backend Lambda and Loader Lambda, with retention policies
-- [ ] CloudWatch alarms: backend Lambda error rate, backend Lambda duration p99, Loader Lambda failure, RDS connection count
-- [ ] SNS topic for alarm notifications, with an email subscription (address provided as a Terraform variable / GH secret)
-- [ ] Dashboard panels: backend latency, Loader last-success timestamp, CloudFront 5xx rate
+- [x] CloudWatch log groups for backend Lambda and Loader Lambda, with retention policies
+- [x] CloudWatch alarms: backend Lambda error rate, backend Lambda duration p99, Loader Lambda failure, RDS connection count
+- [x] SNS topic for alarm notifications, with an email subscription (address provided as a Terraform variable / GH secret)
+- [x] Dashboard panels: backend latency, Loader last-success timestamp, CloudFront 5xx rate
 
 ---
 

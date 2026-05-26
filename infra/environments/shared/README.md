@@ -82,8 +82,13 @@ To keep plaintext out of Terraform state, these are NOT managed via the `integra
 1. Go to GitHub → Settings → Environments → `dev` → Add secret
 2. Add secret `DB_USERNAME` with the database master username
 3. Add secret `DB_PASSWORD` with the database master password
-4. Repeat for the `prod` environment (proactively, or when `infra/environments/prod/` is created)
+4. Add secret `ALERT_EMAIL` with the email address that should receive CloudWatch alarm notifications
+5. Repeat for the `prod` environment (proactively, or when `infra/environments/prod/` is created)
 
 The workflow reads these at runtime and passes them to Terraform. They are never written into `.tfstate` or `.tfvars` files.
 
 **Rotation:** If `db_password` is changed, update the `DB_PASSWORD` secret in the GitHub Environment and re-run the relevant apply job. The apply will update the value in AWS Secrets Manager to match.
+
+**`ALERT_EMAIL` rotation:** changing it via `terraform apply` deletes the old SNS subscription and creates a new one — AWS will send a fresh confirmation email to the new address. Confirm before relying on alerts. The old address stops receiving alerts immediately.
+
+**SNS confirmation:** after the first apply (and after any `ALERT_EMAIL` rotation), AWS sends an email to the configured address titled "AWS Notification - Subscription Confirmation". The operator must click the confirmation link in that email. Until confirmed, the subscription remains in `PendingConfirmation` state and alerts fired during that window are silently dropped — AWS does not queue them.

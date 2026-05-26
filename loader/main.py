@@ -139,6 +139,8 @@ def handler(event, context):
     try:
         asyncio.run(load(bucket))
         logger.info("load_complete", tables=len(TABLE_ORDER))
+        # CloudWatch dashboard signal — do not rename this message
+        logger.info("Loader run complete", extra={"action": action})
         return {"statusCode": 200, "body": body_message}
     except Exception as e:
         logger.error("load_failed", error=str(e))

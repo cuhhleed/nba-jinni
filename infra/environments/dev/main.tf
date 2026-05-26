@@ -256,6 +256,8 @@ module "lambda_loader" {
   subnet_ids         = module.vpc.private_subnet_ids
   security_group_ids = [module.lambda_security_group.security_group_id]
 
+  log_retention_days = 30
+
   environment_variables = {
     DB_HOST          = module.rds.endpoint
     DB_NAME          = module.rds.db_name
@@ -263,5 +265,19 @@ module "lambda_loader" {
     DB_PASSWORD      = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
     DATA_BUCKET_NAME = module.s3_data_exports.bucket_id
   }
+}
+
+module "observability" {
+  source = "../../modules/observability"
+
+  project_name               = var.project_name
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  backend_lambda_name        = module.lambda_backend.function_name
+  loader_lambda_name         = module.lambda_loader.function_name
+  loader_log_group_name      = "/aws/lambda/${module.lambda_loader.function_name}"
+  rds_instance_identifier    = module.rds.instance_identifier
+  cloudfront_distribution_id = module.cloudfront_frontend.distribution_id
+  alert_email                = var.alert_email
 }
 
