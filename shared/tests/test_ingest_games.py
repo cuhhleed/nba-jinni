@@ -303,6 +303,48 @@ async def test_ingest_games_opponent_points_cross_reference(session, test_season
     assert away_stat.points == 105
     assert away_stat.opponent_points == 110
 
+async def test_ingest_games_propagates_game_type(
+    session, test_season, test_home_team, test_away_team, test_player, test_playoff_game
+):
+    player_df = make_player_stats_df([{
+        "person_id": test_player.id, "team_id": test_player.team_id,
+        "position": "F", "minutes": "36:00", "points": 28,
+        "fgm": 10, "fga": 19, "fgp": 0.526,
+        "ftm": 6, "fta": 8, "ftp": 0.75,
+        "tpm": 2, "tpa": 6, "tpp": 0.333,
+        "off_reb": 2, "def_reb": 6, "tot_reb": 8,
+        "assists": 8, "steals": 2, "blocks": 1,
+        "turnovers": 2, "fouls": 2, "plus_minus": 10,
+    }])
+    team_df = make_team_stats_df([
+        {
+            "game_id": test_playoff_game.id, "team_id": test_home_team.id,
+            "points": 115, "rebounds": 48, "assists": 28,
+            "steals": 9, "blocks": 6, "turnovers": 10,
+            "fg_pct": 0.480, "three_pct": 0.390, "ft_pct": 0.830,
+        },
+        {
+            "game_id": test_playoff_game.id, "team_id": test_away_team.id,
+            "points": 108, "rebounds": 42, "assists": 22,
+            "steals": 7, "blocks": 4, "turnovers": 13,
+            "fg_pct": 0.450, "three_pct": 0.360, "ft_pct": 0.790,
+        },
+    ])
+
+    with patch("nbajinni_shared.utils.get_game_stats", new_callable=AsyncMock, return_value=(player_df, team_df)):
+        result = await ingest_games([test_playoff_game], session)
+
+    assert result == (1, 1, 2)
+
+    player_stats = (await session.execute(select(PlayerGameStat))).scalars().all()
+    assert len(player_stats) == 1
+    assert player_stats[0].game_type == "playoff"
+
+    team_stats = (await session.execute(select(TeamGameStat))).scalars().all()
+    assert len(team_stats) == 2
+    assert all(s.game_type == "playoff" for s in team_stats)
+
+
 async def test_invalid_teams(session, test_season, test_home_team, test_player, test_game):
     player_df = make_player_stats_df([{
         "person_id": test_player.id, "team_id": test_player.team_id,

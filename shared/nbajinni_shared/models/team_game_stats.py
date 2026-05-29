@@ -20,6 +20,7 @@ class TeamGameStat(Base):
     fg_pct: Mapped[float] = mapped_column(Numeric(5, 3))
     three_pct: Mapped[float] = mapped_column(Numeric(5, 3))
     ft_pct: Mapped[float] = mapped_column(Numeric(5, 3))
+    game_type: Mapped[str] = mapped_column()
 
     # relationship for bi-directionality
     team: Mapped["Team"] = relationship("Team", back_populates="game_stats")

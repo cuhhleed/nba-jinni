@@ -419,8 +419,8 @@ async def test_get_player_last_5_games_filters_by_type(
     test_away_team,
     test_player_game_stat,
 ):
-    """Seed 1 regular + 1 playoff stat; ?type=regular returns 1, ?type=playoff returns 1,
-    no param (all) returns 2."""
+    """Seed 1 regular + 1 playoff stat; ?type=regular returns 1,
+    ?type=playoff returns 1, no param (all) returns 2."""
     playoff_game = Game(
         id="PLTEST01",
         home_team_id=test_home_team.id,
@@ -493,8 +493,8 @@ async def test_get_player_vs_opponent_filters_by_type(
     test_player_game_stat,
     test_home_standing,
 ):
-    """Seed 1 regular + 1 playoff stat; ?type=regular returns 1, ?type=playoff returns 1,
-    no param (all) returns 2."""
+    """Seed 1 regular + 1 playoff stat; ?type=regular returns 1,
+    ?type=playoff returns 1, no param (all) returns 2."""
     playoff_game = Game(
         id="PLTEST02",
         home_team_id=test_home_team.id,
@@ -540,13 +540,15 @@ async def test_get_player_vs_opponent_filters_by_type(
     await session.flush()
 
     resp_regular = await client.get(
-        f"/players/{test_player.id}/vs-opponent?team_id={test_away_team.id}&type=regular"
+        f"/players/{test_player.id}/vs-opponent"
+        f"?team_id={test_away_team.id}&type=regular"
     )
     assert resp_regular.status_code == 200
     assert len(resp_regular.json()) == 1
 
     resp_playoff = await client.get(
-        f"/players/{test_player.id}/vs-opponent?team_id={test_away_team.id}&type=playoff"
+        f"/players/{test_player.id}/vs-opponent"
+        f"?team_id={test_away_team.id}&type=playoff"
     )
     assert resp_playoff.status_code == 200
     assert len(resp_playoff.json()) == 1

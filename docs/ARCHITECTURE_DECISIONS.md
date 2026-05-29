@@ -645,7 +645,7 @@ Phase 2 is reversible by re-merging the live router into the main backend and re
 ## ADR-009 — Playoff data storage: unified tables with `game_type` discriminator vs. fully separate playoff tables
 
 **Date:** Post-Epic 7 / Playoff season 2025-26  
-**Status:** Proposed
+**Status:** Accepted (refined 2026-05-28)
 
 ### Context
 
@@ -712,40 +712,101 @@ The migration cost of Option B is real but bounded. The `SCHEMA_AMENDMENTS.md` b
 
 ### Implementation scope (ingestion and DB — frontend deferred)
 
-**Schema changes (Alembic migrations, in order):**
+The refined design is a hybrid: the `game_type` discriminator is applied where it is cheap and consistent (raw game and stats tables), while averages are kept in separate tables to eliminate migration risk and prevent correctness errors by construction.
 
-1. `games` — add `game_type VARCHAR NOT NULL DEFAULT 'regular'`; backfill; drop default.
-2. `player_game_stats` — same column addition.
-3. `team_game_stats` — same column addition.
-4. `player_season_averages` — drop PK `(season, player_id)` and `UniqueConstraint("player_id", "season")`; add PK and `UniqueConstraint` on `(season, player_id, game_type)`.
-5. `team_season_averages` — same PK change.
+#### Schema changes
 
-Each `game_type` column addition must follow the SCHEMA_AMENDMENTS.md multi-step pattern. Migrations 4 and 5 are destructive PK changes and must run after 1–3 are fully applied and the backfill is confirmed.
+The refined schema decomposes into four decisions:
 
-**Ingestion changes:**
+**D1 — `games` gets a `game_type` discriminator column.** Unchanged from the original decision. ID-resolved endpoints must remain a single query; splitting `games` would force routing logic across every handler.
 
-- Playoff game ingestion mirrors `run_nightly()` but invokes `nba_api` endpoints with `season_type_all_star="Playoffs"` and writes `game_type="playoff"` on all inserted rows across `games`, `player_game_stats`, and `team_game_stats`.
-- Playoff averages aggregation runs against `WHERE game_type = 'playoff'` and inserts into `player_season_averages` and `team_season_averages` with `game_type="playoff"`. The existing regular season aggregation job is unchanged.
+**D2 — `player_game_stats` and `team_game_stats` get `game_type` as a denormalized column.** Consistent with the existing `season` denormalization on both tables. Enables `compute_*_averages()` to aggregate with `WHERE season = ? AND game_type = ?` without joining `games`.
 
-**Loader changes:**
+**D3 — Averages are split into separate playoff tables.** New tables `player_playoff_season_averages` and `team_playoff_season_averages` mirror their regular-season counterparts exactly. The existing `player_season_averages` and `team_season_averages` tables are unchanged — no PK migration, no destructive step. Every endpoint currently querying averages continues to return regular-season data only, eliminating the latent pooling risk.
 
-- `export_to_json.py`: include `game_type` in the column list for `games`, `player_game_stats`, `team_game_stats`, and treat it as part of the composite key for averages exports.
-- No new table ordering required.
+**D4 — Playoff-only game attributes live in a new `playoff_game_metadata` table.** A subtype-extension table with FK to `games.id` (1:0..1 — regular games have no row; playoff games have exactly one). Holds `round`, `series_game_number`, and `series_record`. Keeps `games` clean of fields that apply to a strict subset of rows. The invariant (a `playoff_game_metadata` row exists if and only if the referenced game has `game_type = 'playoff'`) is enforced by ingestion, not by a DB constraint.
 
-**Backend query audit (scoped to a dedicated story):**
+**D5 — API surfaces the distinction via a `?type=` query param.** Single endpoint per concept; `?type=playoff` switches the data source. Default behavior per endpoint is documented in the audit table below.
 
-Every endpoint touching `games`, `player_game_stats`, or `team_game_stats` must be reviewed. Expected determinations:
+**Modified tables:**
 
-| Endpoint | `game_type` treatment |
-|---|---|
-| `GET /games/upcoming` | Include both — intentional |
-| `GET /teams/{id}/games` | Include both — intentional |
-| `GET /games/h2h` | Include both — intentional |
-| `GET /games/{game_id}` | No filter needed — ID is unique |
-| `GET /players/{id}/season-averages` | Filter `game_type = 'regular'`; playoff averages via new endpoint or `?type=` param |
-| `GET /players/{id}/last-5-games` | Include both by default; `?type=` param to scope |
-| `GET /standings` | Regular season only — standings not computed for playoffs |
-| `GET /games/live/today` | NBA live API, no DB query — unaffected |
+```text
+games
+  game_type  VARCHAR  NEW — 'regular' | 'playoff'
+
+player_game_stats
+  game_type  VARCHAR  NEW — 'regular' | 'playoff' (denormalized)
+
+team_game_stats
+  game_type  VARCHAR  NEW — 'regular' | 'playoff' (denormalized)
+```
+
+**Unchanged tables:** `player_season_averages`, `team_season_averages` — zero schema change; continue to hold regular-season data only.
+
+**New tables:**
+
+```text
+player_playoff_season_averages  — mirrors player_season_averages; PK (season, player_id)
+team_playoff_season_averages    — mirrors team_season_averages; PK (team_id, season)
+playoff_game_metadata           — PK game_id (FK games.id); round, series_game_number, series_record
+```
+
+#### Migration sequence
+
+Six migrations under `shared/alembic/versions/`. Migrations 1–3 add `game_type` to populated tables and must follow the full `SCHEMA_AMENDMENTS.md` touch-point checklist in the same PR — the ingestion upsert `.values()` and `set_={...}` blocks for each table must be updated in the same PR or existing rows will silently retain the synthesized `'regular'` default even after playoff data is loaded. Migrations 4–6 are purely additive and have no choreography concerns.
+
+| # | Migration | Type | Pattern |
+|---|---|---|---|
+| 1 | `games` — add `game_type` (default `'regular'`) | NOT NULL on populated table | `add_required_column` per `SCHEMA_AMENDMENTS.md` |
+| 2 | `player_game_stats` — add `game_type` (default `'regular'`) | NOT NULL on populated table | `add_required_column` |
+| 3 | `team_game_stats` — add `game_type` (default `'regular'`) | NOT NULL on populated table | `add_required_column` |
+| 4 | Create `player_playoff_season_averages` | Purely additive | Plain `op.create_table` |
+| 5 | Create `team_playoff_season_averages` | Purely additive | Plain `op.create_table` |
+| 6 | Create `playoff_game_metadata` | Purely additive | Plain `op.create_table` + FK to `games.id` |
+
+#### Ingestion changes
+
+**Schedule ingestion** (`ingestion/main.py` — `run_schedule_biweekly`): add a parallel `run_playoff_schedule()` that calls the `nba_api` schedule endpoint with `season_type_all_star="Playoffs"` and writes rows with `game_type='playoff'`. When writing playoff games, also insert/upsert into `playoff_game_metadata` for round and series fields parsed from the same API payload. Regular-season schedule ingestion writes `game_type='regular'` explicitly after the migration's `DROP DEFAULT`.
+
+**Nightly stats ingestion** (`shared/nbajinni_shared/utils.py` — `ingest_games`): the function is already game-agnostic and iterates whatever games it is given. The only change is that the upsert `.values()` and `set_={}` blocks for `player_game_stats` and `team_game_stats` must include `game_type`, copied from the parent game. No branching by type at this layer.
+
+**Averages aggregation** (`shared/nbajinni_shared/utils.py`): the regular-season functions gain `WHERE game_type = 'regular'` and continue to write to the existing averages tables. Two new functions are added:
+
+- `compute_player_playoff_averages(season, session)` — mirrors the regular function with `WHERE game_type = 'playoff'`; writes to `player_playoff_season_averages`.
+- `compute_team_playoff_averages(season, session)` — same pattern for team stats.
+
+Both pairs of functions can share a private helper parameterized by `(game_type, source_model, dest_model)`. The `run_nightly()` orchestrator calls all four aggregation functions after game ingestion.
+
+#### Loader changes
+
+`TABLE_ORDER` in `loader/main.py` gains three entries: `playoff_game_metadata` (immediately after `games`, to satisfy the FK), `player_playoff_season_averages`, and `team_playoff_season_averages` (leaf tables, after `seasons`/`players`/`teams`). Truncate order is the automatic reverse. `DATE_COLUMNS` is unaffected — the new tables have no date or datetime columns.
+
+#### Endpoint audit (scoped to a dedicated story)
+
+The hybrid design eliminates the critical-risk endpoints flagged in the original analysis. Endpoints that query only `player_season_averages` or `team_season_averages` are safe by construction — those tables remain regular-season-only and require no filter changes.
+
+| Endpoint | File:Line | Change required |
+|---|---|---|
+| `GET /games/{game_id}` | `backend/app/routers/games.py:330` | When `game.game_type == 'playoff'`, eager-load `playoff_metadata` and include `round` / `series_game_number` / `series_record` in the response. ID lookup itself unchanged. |
+| `GET /games/{game_id}/playerstats` | `backend/app/routers/games.py:307` | No change. ID is globally unique; `player_game_stats.game_id == game_id` returns exactly the right rows regardless of type. |
+| `GET /games/live/{game_id}` | `backend/app/routers/games.py:216` | No change. ID-resolved. |
+| `GET /games/live/today` | `backend/app/routers/games.py:147` | No change. NBA live API, no DB. |
+| `GET /games/upcoming` | `backend/app/routers/games.py:95` | Include both intentionally. Optional: expose `game_type` in the response payload so the frontend can label. |
+| `GET /games/h2h` | `backend/app/routers/games.py:115` | Include both intentionally. Same optional response-field add. |
+| `GET /teams/{id}/games` | `backend/app/routers/teams.py:101` | Include both intentionally. Same optional response-field add. |
+| `GET /teams/{id}/stats` | `backend/app/routers/teams.py:41` | **No filter change needed** — `team_season_averages` is regular-only by construction. Safe by hybrid design. |
+| `GET /players/{id}/season-average` | `backend/app/routers/players.py:193` | Accept `?type=regular\|playoff` (default `regular`). On `?type=playoff`, query `player_playoff_season_averages` instead. |
+| `GET /players/top/preview` | `backend/app/routers/players.py:65` | **No change needed** — queries `player_season_averages`, which is regular-only by construction. Was a critical-risk endpoint in the original analysis; eliminated by the hybrid design. |
+| `GET /players/{id}/last-5-games` | `backend/app/routers/players.py:212` | Accept `?type=regular\|playoff\|all` (default `all` — recent N games includes both naturally). |
+| `GET /players/{id}/vs-opponent` | `backend/app/routers/players.py:242` | Accept `?type=regular\|playoff\|all` (default `all`). |
+| `GET /players/top/recent-performances` | `backend/app/routers/players.py:120` | Recommend default `all` with optional `?type=` param; during playoffs, surfacing playoff performances on the front page is the likely desired behavior. |
+| `GET /standings` / `GET /standings/preview` | `backend/app/routers/standings.py:16,30` | No change. Regular-season only by construction. |
+
+#### Response schema additions
+
+- `Game` response gains `game_type: "regular" | "playoff"`.
+- `Game` response for `game_type = "playoff"` gains optional `playoff_metadata: { round, series_game_number, series_record }`.
+- New `?type=playoff` endpoint variants return the same shape as their regular-season counterparts (the playoff averages tables mirror the regular schemas exactly).
 
 ### Consequences
 
@@ -753,23 +814,25 @@ Every endpoint touching `games`, `player_game_stats`, or `team_game_stats` must 
 
 - All existing endpoints continue to work without routing changes after the migration and audit.
 - Playoff games appear naturally in team schedule and upcoming game views once data is loaded.
-- Player and team averages distinguish regular season from playoff with a single table, one predicate.
-- Loader and export pipeline require column additions only — no new table management.
+- `player_season_averages` and `team_season_averages` are unchanged — no destructive PK migration, no risk to existing data.
+- The prediction widget (`GET /players/top/preview`) and team stats endpoint (`GET /teams/{id}/stats`) are safe by construction: they query regular-only tables and require no filter discipline to remain correct.
+- Playoff series metadata (`round`, `series_game_number`, `series_record`) is modeled as part of the core schema change in `playoff_game_metadata`, not deferred.
 
 **Negative / Watch points:**
 
-- Multi-step migration on live tables must be sequenced per `SCHEMA_AMENDMENTS.md`. The PK change on averages tables is the most operationally sensitive step.
+- Migrations 1–3 add `game_type` to populated tables and must follow the full `SCHEMA_AMENDMENTS.md` touch-point checklist. The ingestion upsert `.values()` and `set_={...}` blocks must be updated in the same PR or existing rows will silently retain the synthesized `'regular'` default.
 - The query audit is a mandatory prerequisite before loading playoff data — loading without it will contaminate views that implicitly assume regular season.
-- `game_type` on stats tables is a denormalized invariant enforced by ingestion, not the DB. A bug in the ingestion layer that writes the wrong `game_type` on stats rows would produce subtle data errors rather than constraint violations. The ingestion tests must cover this.
+- `game_type` on stats tables and the `playoff_game_metadata` invariant are both denormalized properties enforced by ingestion, not by DB constraints. A bug in the ingestion layer that writes the wrong `game_type` or omits a `playoff_game_metadata` row would produce subtle data errors rather than constraint violations. Ingestion tests must cover both invariants.
+- The loader pipeline gains three new tables (`playoff_game_metadata`, `player_playoff_season_averages`, `team_playoff_season_averages`) and two new aggregation functions (`compute_player_playoff_averages`, `compute_team_playoff_averages`) are added to the nightly orchestration.
 - Frontend work for playoff-specific display (series context on game pages, playoff averages tab on player profiles, prediction widget differentiation) is out of scope for this ADR and must be planned as a subsequent epic.
 
 ### Impact on project plan
 
-- **New story: Playoff schema migrations** — five Alembic steps per SCHEMA_AMENDMENTS.md; gating for all subsequent playoff work.
-- **New story: Playoff ingestion job** — `run_playoff()` in ingestion pipeline; playoff averages aggregation; loader export column additions.
-- **New story: Backend query audit** — review and update all endpoints that touch game-related tables; add `game_type` filters where required; confirm intentional inclusions.
+- **New story: Playoff schema migrations** — six Alembic migrations: three `add_required_column` steps for `game_type` on `games`, `player_game_stats`, and `team_game_stats` (each following the full `SCHEMA_AMENDMENTS.md` touch-point checklist); three purely additive `op.create_table` steps for `player_playoff_season_averages`, `team_playoff_season_averages`, and `playoff_game_metadata`. No destructive PK changes. Gating story for all subsequent playoff work.
+- **New story: Playoff ingestion job** — parallel `run_playoff_schedule()` in ingestion pipeline; `playoff_game_metadata` upsert for round/series fields; `compute_player_playoff_averages` and `compute_team_playoff_averages` aggregation functions; `TABLE_ORDER` additions in loader.
+- **New story: Backend query audit** — review and update all endpoints that touch game-related tables per the audit table above; add `?type=` params where required; confirm intentional inclusions; implement `playoff_metadata` in `GET /games/{game_id}` response.
 - **Deferred: Frontend playoff display** — game pages (round/series context), player profile playoff averages tab, prediction widget differentiation. Depends on the three stories above.
-- **`PENDING_FEATURES.md`:** add entry for playoff series metadata (`series_game_number`, `series_record`, `round`) — available from `nba_api`, enriches game pages, deferred from the core ingestion story.
+- **Playoff series metadata is in-scope.** `series_game_number`, `series_record`, and `round` are modeled in `playoff_game_metadata` as part of the core schema change. No `PENDING_FEATURES.md` entry required.
 
 ---
 

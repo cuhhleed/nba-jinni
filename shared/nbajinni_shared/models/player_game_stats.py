@@ -32,6 +32,7 @@ class PlayerGameStat(Base):
     ftp: Mapped[float] = mapped_column(Numeric(5, 2))
     tpp: Mapped[float] = mapped_column(Numeric(5, 2))
     plus_minus: Mapped[int] = mapped_column()
+    game_type: Mapped[str] = mapped_column()
 
     # relationships for bi-directionality
     player: Mapped["Player"] = relationship("Player", back_populates="game_stats")

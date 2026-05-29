@@ -10,6 +10,9 @@ from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
+from nbajinni_shared.models.player_playoff_season_averages import PlayerPlayoffSeasonAverage
+from nbajinni_shared.models.team_playoff_season_averages import TeamPlayoffSeasonAverage
+from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.players import Player
@@ -60,9 +63,10 @@ async def get_game_stats(game_id):
 
 async def ingest_games(games, session):
     processed_games, processed_player_stats, processed_team_stats = 0, 0, 0
-    game_ids = [(game.id, game.season) for game in games]
 
-    for game_id, game_season in game_ids:
+    for game in games:
+        game_id = game.id
+        game_season = game.season
         try:
             processed_player_stats_pg, processed_team_stats_pg = 0, 0
             player_stats, team_stats = await get_game_stats(game_id)
@@ -116,8 +120,12 @@ async def ingest_games(games, session):
                         blks=player_stat_row["blocks"],
                         tos=player_stat_row["turnovers"],
                         pfs=player_stat_row["foulsPersonal"],
-                        plus_minus=player_stat_row["plusMinusPoints"]
-                    ).on_conflict_do_nothing()
+                        plus_minus=player_stat_row["plusMinusPoints"],
+                        game_type=game.game_type,
+                    ).on_conflict_do_update(
+                        index_elements=["game_id", "player_id"],
+                        set_={"game_type": game.game_type},
+                    )
                 )
 
                 result = await session.execute(stmt)
@@ -136,7 +144,7 @@ async def ingest_games(games, session):
                         team_id=team_stat_row["teamId"],
                         season=game_season,
                         points=team_stat_row["points"],
-                        opponent_points = opponents["points"].iloc[0],
+                        opponent_points=opponents["points"].iloc[0],
                         rebounds=team_stat_row["reboundsTotal"],
                         assists=team_stat_row["assists"],
                         steals=team_stat_row["steals"],
@@ -145,14 +153,17 @@ async def ingest_games(games, session):
                         fg_pct=team_stat_row["fieldGoalsPercentage"],
                         three_pct=team_stat_row["threePointersPercentage"],
                         ft_pct=team_stat_row["freeThrowsPercentage"],
-                    ).on_conflict_do_nothing()
+                        game_type=game.game_type,
+                    ).on_conflict_do_update(
+                        index_elements=["game_id", "team_id"],
+                        set_={"game_type": game.game_type},
+                    )
                 )
 
                 result = await session.execute(stmt)
                 if result.rowcount == 1:
                     processed_team_stats_pg += 1
 
-            game = await session.get(Game, game_id)
             game.status = 3
 
             await session.commit()
@@ -284,7 +295,8 @@ async def ingest_schedule(session, season):
                 game_date=game_date,
                 tipoff_at=tipoff_at,
                 season=season,
-                status=game["gameStatus"]
+                status=game["gameStatus"],
+                game_type="regular",
             )
             .on_conflict_do_update(
                 index_elements=["id"],
@@ -302,9 +314,107 @@ async def ingest_schedule(session, season):
 
     return processed
 
-async def compute_player_averages(season, session):
+def _parse_playoff_round(game_label: str) -> int:
+    # Why: nba_api does not expose a documented enum for gameLabel values;
+    # this is a string-based fallback mapping that must be validated against
+    # real schedule data before relying on it in production.
+    label = game_label.strip()
+    if label in ("1st Round",):
+        return 1
+    if label in ("Conf. Semifinals", "Conference Semifinals"):
+        return 2
+    if label in ("Conf. Finals", "Conference Finals"):
+        return 3
+    if label in ("NBA Finals",):
+        return 4
+    return 0
+
+
+async def ingest_playoff_schedule(session, season):
+    games = await get_all_games(season)
     processed = 0
-    # Player averages
+
+    playoff_games = games[games["gameId"].astype(str).str.startswith("004")]
+
+    for _, game in playoff_games.iterrows():
+        # Why: NBA schedules future-round playoff games with team_id=0 as TBD
+        # placeholders until the prior round determines the matchup. Inserting
+        # them violates the games.team_id FK; we re-pick them up on the next
+        # bi-weekly run once the bracket fills in.
+        if int(game["homeTeam_teamId"]) == 0 or int(game["awayTeam_teamId"]) == 0:
+            logger.info("playoff_game_tbd_skipped", game_id=game["gameId"])
+            continue
+
+        tipoff_at = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00")).replace(tzinfo=None)
+        game_date = tipoff_at.date()
+
+        stmt = (
+            insert(Game)
+            .values(
+                id=game["gameId"],
+                home_team_id=game["homeTeam_teamId"],
+                away_team_id=game["awayTeam_teamId"],
+                game_date=game_date,
+                tipoff_at=tipoff_at,
+                season=season,
+                # Why: Game.status is our internal ingestion checkpoint
+                # (1 = box score not yet ingested, 3 = ingested). The schedule
+                # API's gameStatus means "did the game happen". Always insert
+                # 1 so ingest_games picks up newly-discovered past playoff
+                # games; set_={} excludes status so games already advanced to
+                # 3 by ingest_games are not regressed.
+                status=1,
+                game_type="playoff",
+            )
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "home_team_id": game["homeTeam_teamId"],
+                    "away_team_id": game["awayTeam_teamId"],
+                    "game_date": game_date,
+                    "tipoff_at": tipoff_at,
+                },
+            )
+        )
+        result = await session.execute(stmt)
+        if result.rowcount in (1, 2):
+            processed += 1
+
+        series_game_number_raw = game.get("seriesGameNumber", None)
+        try:
+            series_game_number = int(series_game_number_raw) if series_game_number_raw is not None else 0
+        except (ValueError, TypeError):
+            series_game_number = 0
+
+        series_record_raw = game.get("seriesText", None)
+        series_record = series_record_raw if series_record_raw else "0-0"
+
+        round_number = _parse_playoff_round(str(game.get("gameLabel", "") or ""))
+
+        meta_stmt = (
+            insert(PlayoffGameMetadata)
+            .values(
+                game_id=game["gameId"],
+                round=round_number,
+                series_game_number=series_game_number,
+                series_record=series_record,
+            )
+            .on_conflict_do_update(
+                index_elements=["game_id"],
+                set_={
+                    "round": round_number,
+                    "series_game_number": series_game_number,
+                    "series_record": series_record,
+                },
+            )
+        )
+        await session.execute(meta_stmt)
+
+    return processed
+
+
+async def _compute_player_averages(season, session, game_type, dest_model):
+    processed = 0
     player_avg_query = (
         select(
             PlayerGameStat.player_id,
@@ -330,7 +440,7 @@ async def compute_player_averages(season, session):
             func.avg(PlayerGameStat.tpp).label("tpp"),
             func.avg(PlayerGameStat.plus_minus).label("plus_minus_pg"),
         )
-        .where(PlayerGameStat.season == season)
+        .where(PlayerGameStat.season == season, PlayerGameStat.game_type == game_type)
         .group_by(PlayerGameStat.player_id)
     )
 
@@ -338,7 +448,7 @@ async def compute_player_averages(season, session):
 
     for row in player_results:
         stmt = (
-            insert(PlayerSeasonAverage)
+            insert(dest_model)
             .values(
                 player_id=row.player_id,
                 season=season,
@@ -398,9 +508,16 @@ async def compute_player_averages(season, session):
 
     return processed
 
-async def compute_team_averages(season, session):
+
+async def compute_player_averages(season, session):
+    return await _compute_player_averages(season, session, "regular", PlayerSeasonAverage)
+
+
+async def compute_player_playoff_averages(season, session):
+    return await _compute_player_averages(season, session, "playoff", PlayerPlayoffSeasonAverage)
+
+async def _compute_team_averages(season, session, game_type, dest_model):
     processed = 0
-    # Team averages
     team_avg_query = (
         select(
             TeamGameStat.team_id,
@@ -416,7 +533,7 @@ async def compute_team_averages(season, session):
             func.avg(TeamGameStat.three_pct).label("three_pct"),
             func.avg(TeamGameStat.ft_pct).label("ft_pct"),
         )
-        .where(TeamGameStat.season == season)
+        .where(TeamGameStat.season == season, TeamGameStat.game_type == game_type)
         .group_by(TeamGameStat.team_id)
     )
 
@@ -424,7 +541,7 @@ async def compute_team_averages(season, session):
 
     for row in team_results:
         stmt = (
-            insert(TeamSeasonAverage)
+            insert(dest_model)
             .values(
                 team_id=row.team_id,
                 season=season,
@@ -463,3 +580,11 @@ async def compute_team_averages(season, session):
             processed += 1
 
     return processed
+
+
+async def compute_team_averages(season, session):
+    return await _compute_team_averages(season, session, "regular", TeamSeasonAverage)
+
+
+async def compute_team_playoff_averages(season, session):
+    return await _compute_team_averages(season, session, "playoff", TeamPlayoffSeasonAverage)

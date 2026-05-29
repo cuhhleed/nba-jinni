@@ -110,6 +110,7 @@ async def test_excludes_other_season(
         tipoff_at=datetime(2023, 10, 1, 19, 0),
         season="2023-24",
         status=3,
+        game_type="regular",
     )
     session.add(other_game)
     await session.flush()
@@ -140,6 +141,7 @@ async def test_excludes_other_season(
         ftp=80.00,
         tpp=50.00,
         plus_minus=20,
+        game_type="regular",
     )
     session.add(other_stat)
     await session.flush()
@@ -189,6 +191,7 @@ async def test_traded_player(
         ftp=75.00,
         tpp=33.33,
         plus_minus=5,
+        game_type="regular",
     )
 
     stat_team_b = PlayerGameStat(
@@ -217,6 +220,7 @@ async def test_traded_player(
         ftp=60.00,
         tpp=25.00,
         plus_minus=-2,
+        game_type="regular",
     )
 
     session.add_all([stat_team_a, stat_team_b])
@@ -235,6 +239,80 @@ async def test_traded_player(
     assert avg.games_played == expected.games_played
     assert avg.points_pg == expected.points_pg
     assert avg.asts_pg == expected.asts_pg
+
+
+async def test_compute_player_averages_excludes_playoff_games(
+    session, test_season, test_player, test_home_team, test_game, test_playoff_game
+):
+    regular_stat = PlayerGameStat(
+        game_id=test_game.id,
+        player_id=test_player.id,
+        season=test_season.season,
+        team_id=test_home_team.id,
+        pos="SF",
+        min=36,
+        points=30,
+        fgm=11,
+        fga=20,
+        ftm=6,
+        fta=8,
+        tpm=2,
+        tpa=5,
+        off_reb=1,
+        def_reb=7,
+        tot_reb=8,
+        asts=10,
+        stls=2,
+        blks=1,
+        tos=3,
+        pfs=2,
+        fgp=55.00,
+        ftp=75.00,
+        tpp=40.00,
+        plus_minus=12,
+        game_type="regular",
+    )
+    playoff_stat = PlayerGameStat(
+        game_id=test_playoff_game.id,
+        player_id=test_player.id,
+        season=test_season.season,
+        team_id=test_home_team.id,
+        pos="SF",
+        min=40,
+        points=50,
+        fgm=20,
+        fga=30,
+        ftm=8,
+        fta=10,
+        tpm=2,
+        tpa=4,
+        off_reb=5,
+        def_reb=10,
+        tot_reb=15,
+        asts=12,
+        stls=4,
+        blks=3,
+        tos=1,
+        pfs=1,
+        fgp=66.67,
+        ftp=80.00,
+        tpp=50.00,
+        plus_minus=20,
+        game_type="playoff",
+    )
+    session.add_all([regular_stat, playoff_stat])
+    await session.flush()
+
+    result = await compute_player_averages(test_season.season, session)
+
+    assert result == 1
+
+    rows = (await session.execute(select(PlayerSeasonAverage))).scalars().all()
+    assert len(rows) == 1
+
+    avg = rows[0]
+    assert avg.games_played == 1
+    assert avg.points_pg == 30
 
 
 async def test_empty_season(session, test_season):

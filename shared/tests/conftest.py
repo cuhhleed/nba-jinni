@@ -9,6 +9,9 @@ from nbajinni_shared.models.player_game_stats import PlayerGameStat
 from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
+from nbajinni_shared.models.player_playoff_season_averages import PlayerPlayoffSeasonAverage
+from nbajinni_shared.models.team_playoff_season_averages import TeamPlayoffSeasonAverage
+from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
 import os
 from datetime import date, datetime
 from dotenv import load_dotenv
@@ -71,21 +74,21 @@ async def test_second_player(session, test_away_team):
 
 @pytest_asyncio.fixture
 async def test_game(session, test_home_team, test_away_team):
-    game = Game(id="0022300001", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 1), tipoff_at=datetime(2024, 10, 1, 19, 0), season="2024-25", status=1)
+    game = Game(id="0022300001", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 1), tipoff_at=datetime(2024, 10, 1, 19, 0), season="2024-25", status=1, game_type="regular")
     session.add(game)
     await session.flush()
     return game
 
 @pytest_asyncio.fixture
 async def test_second_game(session, test_home_team, test_away_team):
-    game = Game(id="0022300002", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 2), tipoff_at=datetime(2024, 10, 2, 19, 0), season="2024-25", status=1)
+    game = Game(id="0022300002", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2024, 10, 2), tipoff_at=datetime(2024, 10, 2, 19, 0), season="2024-25", status=1, game_type="regular")
     session.add(game)
     await session.flush()
     return game
 
 @pytest_asyncio.fixture
 async def test_future_game(session, test_home_team, test_away_team):
-    game = Game(id="0022300003", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2099, 12, 31), tipoff_at=datetime(2099, 12, 31, 19, 0), season="2024-25", status=1)
+    game = Game(id="0022300003", home_team_id=test_home_team.id, away_team_id=test_away_team.id, game_date=date(2099, 12, 31), tipoff_at=datetime(2099, 12, 31, 19, 0), season="2024-25", status=1, game_type="regular")
     session.add(game)
     await session.flush()
     return game
@@ -186,6 +189,7 @@ async def test_player_game_stat(session, test_season, test_game, test_player, te
         ftp=75.00,
         tpp=40.00,
         plus_minus=12,
+        game_type="regular",
     )
     session.add(stat)
     await session.flush()
@@ -220,6 +224,7 @@ async def test_second_player_game_stat(session, test_season, test_second_game, t
         ftp=66.67,
         tpp=28.57,
         plus_minus=-4,
+        game_type="regular",
     )
     session.add(stat)
     await session.flush()
@@ -254,6 +259,7 @@ async def test_second_player_first_game_stat(session, test_season, test_game, te
         ftp=83.33,
         tpp=33.33,
         plus_minus=5,
+        game_type="regular",
     )
     session.add(stat)
     await session.flush()
@@ -276,6 +282,7 @@ async def test_home_team_game_stat(session, test_season, test_game, test_home_te
         fg_pct=0.465,
         three_pct=0.380,
         ft_pct=0.810,
+        game_type="regular",
     )
     session.add(stat)
     await session.flush()
@@ -298,6 +305,7 @@ async def test_home_team_second_game_stat(session, test_season, test_second_game
         fg_pct=0.425,
         three_pct=0.320,
         ft_pct=0.780,
+        game_type="regular",
     )
     session.add(stat)
     await session.flush()
@@ -320,6 +328,7 @@ async def test_away_team_game_stat(session, test_season, test_game, test_away_te
         fg_pct=0.440,
         three_pct=0.350,
         ft_pct=0.750,
+        game_type="regular",
     )
     session.add(stat)
     await session.flush()
@@ -361,6 +370,90 @@ async def test_player_season_average(session, test_season, test_player):
 @pytest_asyncio.fixture
 async def test_team_season_average(session, test_season, test_home_team):
     avg = TeamSeasonAverage(
+        team_id=test_home_team.id,
+        season=test_season.season,
+        games_played=1,
+        points=80.0,
+        opponent_points=85.0,
+        rebounds=30.0,
+        assists=15.0,
+        steals=4.0,
+        blocks=2.0,
+        turnovers=10.0,
+        fg_pct=0.400,
+        three_pct=0.300,
+        ft_pct=0.700,
+    )
+    session.add(avg)
+    await session.flush()
+    return avg
+
+
+@pytest_asyncio.fixture
+async def test_playoff_game(session, test_home_team, test_away_team):
+    game = Game(
+        id="0042300001",
+        home_team_id=test_home_team.id,
+        away_team_id=test_away_team.id,
+        game_date=date(2024, 4, 20),
+        tipoff_at=datetime(2024, 4, 20, 20, 0),
+        season="2024-25",
+        status=3,
+        game_type="playoff",
+    )
+    session.add(game)
+    await session.flush()
+    return game
+
+
+@pytest_asyncio.fixture
+async def test_playoff_game_metadata(session, test_playoff_game):
+    metadata = PlayoffGameMetadata(
+        game_id=test_playoff_game.id,
+        round=1,
+        series_game_number=1,
+        series_record="0-0",
+    )
+    session.add(metadata)
+    await session.flush()
+    return metadata
+
+
+@pytest_asyncio.fixture
+async def test_player_playoff_season_average(session, test_season, test_player):
+    avg = PlayerPlayoffSeasonAverage(
+        season=test_season.season,
+        player_id=test_player.id,
+        games_played=1,
+        min_pg=10.00,
+        points_pg=5.00,
+        fgm_pg=2.00,
+        fga_pg=5.00,
+        ftm_pg=1.00,
+        fta_pg=2.00,
+        tpm_pg=0.00,
+        tpa_pg=1.00,
+        off_reb_pg=0.00,
+        def_reb_pg=1.00,
+        tot_reb_pg=1.00,
+        asts_pg=1.00,
+        stls_pg=0.00,
+        blks_pg=0.00,
+        tos_pg=1.00,
+        pfs_pg=1.00,
+        fgp=40.00,
+        ftp=50.00,
+        tpp=0.00,
+        plus_minus_pg=0.00,
+    )
+    session.add(avg)
+    await session.flush()
+    return avg
+
+
+@pytest_asyncio.fixture
+async def test_team_playoff_season_average(session, test_season, test_home_team):
+    avg = TeamPlayoffSeasonAverage(
         team_id=test_home_team.id,
         season=test_season.season,
         games_played=1,

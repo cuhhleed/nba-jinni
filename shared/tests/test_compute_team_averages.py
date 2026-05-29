@@ -89,6 +89,7 @@ async def test_excludes_other_season(
         tipoff_at=datetime(2023, 10, 1, 19, 0),
         season="2023-24",
         status=3,
+        game_type="regular",
     )
     session.add(other_game)
     await session.flush()
@@ -107,6 +108,7 @@ async def test_excludes_other_season(
         fg_pct=0.550,
         three_pct=0.450,
         ft_pct=0.900,
+        game_type="regular",
     )
     session.add(other_stat)
     await session.flush()
@@ -124,6 +126,56 @@ async def test_excludes_other_season(
     assert avg.season == "2024-25"
     assert avg.games_played == expected.games_played
     assert avg.points == expected.points
+
+
+async def test_compute_team_averages_excludes_playoff_games(
+    session, test_season, test_home_team, test_away_team, test_game, test_playoff_game
+):
+    regular_stat = TeamGameStat(
+        game_id=test_game.id,
+        team_id=test_home_team.id,
+        season=test_season.season,
+        points=110,
+        opponent_points=102,
+        rebounds=45,
+        assists=25,
+        steals=8,
+        blocks=5,
+        turnovers=12,
+        fg_pct=0.465,
+        three_pct=0.380,
+        ft_pct=0.810,
+        game_type="regular",
+    )
+    playoff_stat = TeamGameStat(
+        game_id=test_playoff_game.id,
+        team_id=test_home_team.id,
+        season=test_season.season,
+        points=130,
+        opponent_points=90,
+        rebounds=55,
+        assists=35,
+        steals=12,
+        blocks=8,
+        turnovers=8,
+        fg_pct=0.550,
+        three_pct=0.450,
+        ft_pct=0.900,
+        game_type="playoff",
+    )
+    session.add_all([regular_stat, playoff_stat])
+    await session.flush()
+
+    result = await compute_team_averages(test_season.season, session)
+
+    assert result == 1
+
+    rows = (await session.execute(select(TeamSeasonAverage))).scalars().all()
+    assert len(rows) == 1
+
+    avg = rows[0]
+    assert avg.games_played == 1
+    assert avg.points == 110
 
 
 async def test_empty_season(session, test_season):

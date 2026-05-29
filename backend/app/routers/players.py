@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
-from nbajinni_shared.models.player_playoff_season_averages import PlayerPlayoffSeasonAverage
+from nbajinni_shared.models.player_playoff_season_averages import (
+    PlayerPlayoffSeasonAverage,
+)
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.players import Player
 from sqlalchemy import func, select
@@ -225,7 +227,10 @@ async def get_player_season_average(
 
     row = (await db.execute(stmt)).scalar_one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail=f"No {type} season average data found for this player.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {type} season average data found for this player.",
+        )
     return row
 
 
