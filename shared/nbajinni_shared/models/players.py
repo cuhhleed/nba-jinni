@@ -19,3 +19,4 @@ class Player(Base):
     team: Mapped["Team"] = relationship("Team", back_populates="players")
     game_stats: Mapped[list["PlayerGameStat"]] = relationship("PlayerGameStat", back_populates="player")
     season_averages: Mapped[list["PlayerSeasonAverage"]] = relationship("PlayerSeasonAverage", back_populates="player")
+    playoff_season_averages: Mapped[list["PlayerPlayoffSeasonAverage"]] = relationship("PlayerPlayoffSeasonAverage", back_populates="player")

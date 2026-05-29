@@ -341,6 +341,7 @@ async def get_game_details(game_id: str, db: AsyncSession = Depends(get_db)):
                 selectinload(Game.team_stats),
                 selectinload(Game.home_team).selectinload(Team.standing),
                 selectinload(Game.away_team).selectinload(Team.standing),
+                selectinload(Game.playoff_metadata),
             )
         )
         game = (await db.execute(stmt)).scalar_one()
@@ -363,6 +364,7 @@ async def get_game_details(game_id: str, db: AsyncSession = Depends(get_db)):
                 Team.season_averages.and_(TeamSeasonAverage.season == game.season)
             ),
             selectinload(Game.away_team).selectinload(Team.standing),
+            selectinload(Game.playoff_metadata),
         )
     )
     game = (await db.execute(stmt)).scalar_one()

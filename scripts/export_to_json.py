@@ -30,11 +30,14 @@ TABLE_ORDER = [
     "users",
     "players",
     "games",
+    "playoff_game_metadata",
     "standings",
     "player_game_stats",
     "team_game_stats",
     "player_season_averages",
     "team_season_averages",
+    "player_playoff_season_averages",
+    "team_playoff_season_averages",
 ]
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "exports"

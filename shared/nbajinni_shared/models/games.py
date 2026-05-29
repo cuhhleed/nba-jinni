@@ -1,8 +1,14 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy import DateTime, ForeignKey
 from datetime import date, datetime
 from nbajinni_shared.base import Base
+
+if TYPE_CHECKING:
+    from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
+
 
 class Game(Base):
     __tablename__ = "games"
@@ -17,9 +23,11 @@ class Game(Base):
     game_date: Mapped[date] = mapped_column(index=True)
     tipoff_at: Mapped[datetime] = mapped_column()
     status: Mapped[int] = mapped_column()
+    game_type: Mapped[str] = mapped_column()
 
     # relationships for bi-directionality
     home_team: Mapped["Team"] = relationship("Team", foreign_keys=[home_team_id], back_populates="home_games")
     away_team: Mapped["Team"] = relationship("Team", foreign_keys=[away_team_id], back_populates="away_games")
     player_stats: Mapped[list["PlayerGameStat"]] = relationship("PlayerGameStat", back_populates="game")
     team_stats: Mapped[list["TeamGameStat"]] = relationship("TeamGameStat", back_populates="game")
+    playoff_metadata: Mapped[Optional["PlayoffGameMetadata"]] = relationship("PlayoffGameMetadata", back_populates="game", uselist=False)

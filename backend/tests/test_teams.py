@@ -41,3 +41,23 @@ async def test_get_team_games_unplayed(
 async def test_get_team_games_not_found(client, test_home_standing):
     response = await client.get("/teams/9999999/games")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_team_games_includes_game_type(
+    client,
+    test_game,
+    test_upcoming_game,
+    test_home_team,
+    test_home_team_game_stat,
+    test_away_team_game_stat,
+    test_home_standing,
+):
+    """Both recent and upcoming game entries include game_type field."""
+    response = await client.get(f"/teams/{test_home_team.id}/games")
+    assert response.status_code == 200
+    data = response.json()
+    for game in data["recent"]:
+        assert "game_type" in game
+    for game in data["upcoming"]:
+        assert "game_type" in game

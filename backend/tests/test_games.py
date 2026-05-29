@@ -8,7 +8,7 @@ Happy-path tests for game endpoints:
 """
 
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -139,6 +139,7 @@ async def test_get_h2h_symmetric(
         tipoff_at=datetime(2024, 11, 1, 19, 0),
         season=test_game.season,
         status=3,
+        game_type="regular",
     )
     session.add(reversed_game)
     await session.flush()
@@ -346,6 +347,117 @@ async def test_live_game_not_found(client):
 
 
 @pytest.mark.asyncio
+async def test_get_game_includes_playoff_metadata_when_playoff(
+    client,
+    session,
+    test_season,
+    test_playoff_game,
+    test_playoff_game_metadata,
+    test_home_team,
+    test_away_team,
+    test_home_standing,
+    test_away_standing,
+):
+    """Completed playoff game → GameResult has playoff_metadata populated."""
+    from nbajinni_shared.models.team_game_stats import TeamGameStat
+
+    home_stat = TeamGameStat(
+        game_id=test_playoff_game.id,
+        team_id=test_home_team.id,
+        season=test_season.season,
+        game_type="playoff",
+        points=110,
+        opponent_points=102,
+        rebounds=45,
+        assists=25,
+        steals=8,
+        blocks=5,
+        turnovers=12,
+        fg_pct=0.465,
+        three_pct=0.380,
+        ft_pct=0.810,
+    )
+    away_stat = TeamGameStat(
+        game_id=test_playoff_game.id,
+        team_id=test_away_team.id,
+        season=test_season.season,
+        game_type="playoff",
+        points=102,
+        opponent_points=110,
+        rebounds=38,
+        assists=22,
+        steals=7,
+        blocks=4,
+        turnovers=14,
+        fg_pct=0.440,
+        three_pct=0.350,
+        ft_pct=0.750,
+    )
+    session.add(home_stat)
+    session.add(away_stat)
+    await session.flush()
+
+    response = await client.get(f"/games/{test_playoff_game.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["kind"] == "result"
+    assert data["game_type"] == "playoff"
+    pm = data["playoff_metadata"]
+    assert pm is not None
+    assert pm["round"] == test_playoff_game_metadata.round
+    assert pm["series_game_number"] == test_playoff_game_metadata.series_game_number
+    assert pm["series_record"] == test_playoff_game_metadata.series_record
+
+
+@pytest.mark.asyncio
+async def test_get_game_playoff_metadata_null_for_regular(
+    client,
+    test_game,
+    test_home_team_game_stat,
+    test_away_team_game_stat,
+):
+    """Completed regular game → playoff_metadata is null."""
+    response = await client.get(f"/games/{test_game.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["kind"] == "result"
+    assert data["playoff_metadata"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_upcoming_games_includes_game_type(
+    client,
+    session,
+    test_season,
+    test_home_team,
+    test_away_team,
+):
+    """Upcoming game list includes game_type on each entry."""
+    from nbajinni_shared.models.games import Game
+
+    near_future = date.today() + timedelta(days=1)
+    upcoming = Game(
+        id="UPCOMING01",
+        home_team_id=test_home_team.id,
+        away_team_id=test_away_team.id,
+        game_date=near_future,
+        tipoff_at=datetime.combine(near_future, datetime.min.time()).replace(hour=19),
+        season=test_season.season,
+        status=1,
+        game_type="regular",
+    )
+    session.add(upcoming)
+    await session.flush()
+
+    response = await client.get("/games/upcoming")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+    for game in data:
+        assert "game_type" in game
+
+
+@pytest.mark.asyncio
 async def test_live_game_live_success(
     client,
     session,
@@ -366,6 +478,7 @@ async def test_live_game_live_success(
         tipoff_at=datetime(2024, 10, 1, 19, 0),
         season=test_season.season,
         status=1,
+        game_type="regular",
     )
     session.add(live_game)
     await session.flush()

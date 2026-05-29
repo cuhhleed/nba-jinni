@@ -12,7 +12,7 @@ type Props = {
 
 const bubbleClasses = {
   md: "w-11 h-11 sm:w-14 sm:h-14 lg:w-18 lg:h-18 text-base sm:text-lg lg:text-xl",
-  lg: "w-14 h-14  sm:w-16 sm:h-16 lg:w-20 lg:h-20 text-xl sm:text-2xl lg:text-3xl",
+  lg: "w-14 h-14  sm:w-16 sm:h-16 lg:w-20 lg:h-20 text-lg sm:text-xl lg:text-2xl",
 };
 
 export default function StatBubble({

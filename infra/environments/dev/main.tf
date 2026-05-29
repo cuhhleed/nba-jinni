@@ -131,10 +131,11 @@ module "lambda_backend" {
   security_group_ids = [module.lambda_security_group.security_group_id]
 
   environment_variables = {
-    DB_HOST     = module.rds.endpoint
-    DB_NAME     = module.rds.db_name
-    DB_USER     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
-    DB_PASSWORD = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
+    DB_HOST         = module.rds.endpoint
+    DB_NAME         = module.rds.db_name
+    DB_USER         = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["username"]
+    DB_PASSWORD     = jsondecode(aws_secretsmanager_secret_version.db_credentials_secret.secret_string)["password"]
+    ALLOWED_ORIGINS = "https://${module.cloudfront_frontend.domain_name}"
   }
 }
 

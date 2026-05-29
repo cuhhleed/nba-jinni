@@ -8,6 +8,9 @@ from nbajinni_shared.models.team_game_stats import TeamGameStat
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.teams import Team
 from nbajinni_shared.models.users import User
+from nbajinni_shared.models.player_playoff_season_averages import PlayerPlayoffSeasonAverage
+from nbajinni_shared.models.team_playoff_season_averages import TeamPlayoffSeasonAverage
+from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
 
 __all__ = [
     "Game",
@@ -20,4 +23,7 @@ __all__ = [
     "TeamSeasonAverage",
     "Team",
     "User",
+    "PlayerPlayoffSeasonAverage",
+    "TeamPlayoffSeasonAverage",
+    "PlayoffGameMetadata",
 ]

@@ -20,6 +20,7 @@ class Team(Base):
     players: Mapped[list["Player"]] = relationship("Player", back_populates="team")
     game_stats: Mapped[list["TeamGameStat"]] = relationship("TeamGameStat", back_populates="team")
     season_averages: Mapped[list["TeamSeasonAverage"]] = relationship("TeamSeasonAverage", back_populates="team")
+    playoff_season_averages: Mapped[list["TeamPlayoffSeasonAverage"]] = relationship("TeamPlayoffSeasonAverage", back_populates="team")
     home_games: Mapped[list["Game"]] = relationship("Game", foreign_keys="[Game.home_team_id]", back_populates="home_team")
     away_games: Mapped[list["Game"]] = relationship("Game", foreign_keys="[Game.away_team_id]", back_populates="away_team")
 

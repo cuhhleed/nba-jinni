@@ -1,9 +1,13 @@
 from datetime import date as date_type
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
+from nbajinni_shared.models.player_playoff_season_averages import (
+    PlayerPlayoffSeasonAverage,
+)
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.players import Player
 from sqlalchemy import func, select
@@ -121,7 +125,10 @@ async def get_top_players_preview(db: AsyncSession = Depends(get_db)):
     "/players/top/recent-performances",
     response_model=list[RecentPerformance],
 )
-async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
+async def get_recent_top_performances(
+    type: Literal["regular", "playoff", "all"] = Query("all"),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Returns up to 3 standout individual performances from the last two ingested
     game-days.
@@ -144,6 +151,8 @@ async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
         .order_by(Game.game_date.desc())
         .limit(2)
     )
+    if type != "all":
+        recent_dates_stmt = recent_dates_stmt.where(Game.game_type == type)
     recent_dates_result = await db.execute(recent_dates_stmt)
     recent_date_rows = recent_dates_result.scalars().all()
 
@@ -165,6 +174,8 @@ async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
         .join(Player, PlayerGameStat.player_id == Player.id)
         .where(Game.game_date.in_(recent_dates))
     )
+    if type != "all":
+        stmt = stmt.where(Game.game_type == type)
     rows = (await db.execute(stmt)).all()
 
     scored: list[tuple[int, int, RecentPerformance]] = []
@@ -193,26 +204,44 @@ async def get_recent_top_performances(db: AsyncSession = Depends(get_db)):
 @router.get(
     "/players/{player_id}/season-average", response_model=PlayerSeasonAverageBase
 )
-async def get_player_season_average(player_id: int, db: AsyncSession = Depends(get_db)):
+async def get_player_season_average(
+    player_id: int,
+    type: Literal["regular", "playoff"] = Query("regular"),
+    db: AsyncSession = Depends(get_db),
+):
     player_exists = await db.scalar(select(Player.id).where(Player.id == player_id))
     if player_exists is None:
         raise HTTPException(status_code=404, detail="Player not found.")
 
+    if type == "playoff":
+        avg_model = PlayerPlayoffSeasonAverage
+    else:
+        avg_model = PlayerSeasonAverage
+
     stmt = (
-        select(PlayerSeasonAverage)
-        .where(PlayerSeasonAverage.player_id == player_id)
-        .order_by(PlayerSeasonAverage.season.desc())
+        select(avg_model)
+        .where(avg_model.player_id == player_id)
+        .order_by(avg_model.season.desc())
         .limit(1)
     )
 
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {type} season average data found for this player.",
+        )
+    return row
 
 
 @router.get(
     "/players/{player_id}/last-5-games", response_model=list[PlayerGameStatWithContext]
 )
-async def get_player_last_5_games(player_id: int, db: AsyncSession = Depends(get_db)):
+async def get_player_last_5_games(
+    player_id: int,
+    type: Literal["regular", "playoff", "all"] = Query("all"),
+    db: AsyncSession = Depends(get_db),
+):
     player_exists = await db.scalar(select(Player.id).where(Player.id == player_id))
     if player_exists is None:
         raise HTTPException(status_code=404, detail="Player not found.")
@@ -224,6 +253,8 @@ async def get_player_last_5_games(player_id: int, db: AsyncSession = Depends(get
         .order_by(Game.game_date.desc())
         .limit(5)
     )
+    if type != "all":
+        stmt = stmt.where(Game.game_type == type)
 
     rows = (await db.execute(stmt)).all()
 
@@ -245,6 +276,7 @@ async def get_player_last_5_games(player_id: int, db: AsyncSession = Depends(get
 async def get_player_vs_opponent(
     player_id: int,
     team_id: int = Query(...),
+    type: Literal["regular", "playoff", "all"] = Query("all"),
     db: AsyncSession = Depends(get_db),
 ):
     player_exists = await db.scalar(select(Player.id).where(Player.id == player_id))
@@ -266,6 +298,8 @@ async def get_player_vs_opponent(
         )
         .order_by(Game.game_date.desc())
     )
+    if type != "all":
+        stmt = stmt.where(Game.game_type == type)
 
     rows = (await db.execute(stmt)).all()
 
