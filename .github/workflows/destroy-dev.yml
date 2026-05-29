@@ -1,0 +1,159 @@
+name: Destroy Dev Infrastructure (cost-saving teardown)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'destroy-dev' to confirm. Any other value aborts before any AWS calls."
+        required: true
+        type: string
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-apply-dev
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: 1.10.0
+  AWS_REGION: us-east-1
+  TF_STATE_BUCKET: nbajinni-terraform-state
+  TF_LOCK_TABLE: nbajinni-terraform-locks
+  TF_WORKING_DIR_DEV: infra/environments/dev
+
+jobs:
+  destroy-dev:
+    runs-on: ubuntu-latest
+    environment: dev
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR_DEV }}
+    steps:
+      - name: Validate confirmation input
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "destroy-dev" ]; then
+            echo "ERROR: confirm input must be exactly 'destroy-dev', got '$CONFIRM'"
+            exit 1
+          fi
+          echo "Confirmation accepted. Proceeding."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.TF_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Capture db_secret_arn (must run before destroy)
+        id: secret
+        run: |
+          set +e
+          ARN=$(terraform output -raw db_secret_arn 2>/dev/null)
+          set -e
+          if [ -n "$ARN" ] && [[ "$ARN" != Warning:* ]] && [[ "$ARN" != *"No outputs found"* ]]; then
+            echo "Captured secret ARN for cleanup."
+            echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+          else
+            echo "No db_secret_arn output found (infra may already be destroyed or never applied). Will skip secret cleanup."
+            echo "arn=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: List destroy targets
+        run: |
+          echo "Resources to be destroyed:"
+          echo "  module.rds"
+          echo "  module.vpc.aws_nat_gateway.main"
+          echo "  module.vpc.aws_eip.nat"
+          echo "  module.vpc.aws_route.private_internet"
+          echo "  aws_secretsmanager_secret.db_credentials"
+          echo "  aws_secretsmanager_secret_version.db_credentials_secret"
+          echo "  module.observability.aws_cloudwatch_dashboard.overview"
+          echo "  module.observability.aws_cloudwatch_metric_alarm.backend_error_rate"
+          echo "  module.observability.aws_cloudwatch_metric_alarm.backend_duration_p99"
+          echo "  module.observability.aws_cloudwatch_metric_alarm.loader_failure"
+          echo "  module.observability.aws_cloudwatch_metric_alarm.rds_connection_saturation"
+
+      - name: Terraform destroy (targeted)
+        run: |
+          terraform destroy -auto-approve -input=false \
+            -target=module.rds \
+            -target=module.vpc.aws_nat_gateway.main \
+            -target=module.vpc.aws_eip.nat \
+            -target=module.vpc.aws_route.private_internet \
+            -target=aws_secretsmanager_secret.db_credentials \
+            -target=aws_secretsmanager_secret_version.db_credentials_secret \
+            -target=module.observability.aws_cloudwatch_dashboard.overview \
+            -target=module.observability.aws_cloudwatch_metric_alarm.backend_error_rate \
+            -target=module.observability.aws_cloudwatch_metric_alarm.backend_duration_p99 \
+            -target=module.observability.aws_cloudwatch_metric_alarm.loader_failure \
+            -target=module.observability.aws_cloudwatch_metric_alarm.rds_connection_saturation
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_project_name: nbajinni
+          TF_VAR_environment: dev
+          TF_VAR_db_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+
+      - name: Force-delete Secrets Manager secret
+        if: steps.secret.outputs.arn != ''
+        env:
+          SECRET_ID: ${{ steps.secret.outputs.arn }}
+        run: |
+          aws secretsmanager delete-secret \
+            --secret-id "$SECRET_ID" \
+            --force-delete-without-recovery \
+            --no-cli-pager 2>/dev/null && echo "Secret deleted." || echo "Secret not found or already deleted, continuing."
+
+      - name: Write run summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Dev teardown summary
+
+          - **Triggered by**: ${{ github.actor }}
+          - **Commit**: ${{ github.sha }}
+
+          ### Destroyed targets
+
+          - `module.rds`
+          - `module.vpc.aws_nat_gateway.main`
+          - `module.vpc.aws_eip.nat`
+          - `module.vpc.aws_route.private_internet`
+          - `aws_secretsmanager_secret.db_credentials`
+          - `aws_secretsmanager_secret_version.db_credentials_secret`
+          - `module.observability.aws_cloudwatch_dashboard.overview`
+          - `module.observability.aws_cloudwatch_metric_alarm.backend_error_rate`
+          - `module.observability.aws_cloudwatch_metric_alarm.backend_duration_p99`
+          - `module.observability.aws_cloudwatch_metric_alarm.loader_failure`
+          - `module.observability.aws_cloudwatch_metric_alarm.rds_connection_saturation`
+
+          ### Preserved
+
+          - Lambda functions
+          - API Gateway
+          - CloudFront distribution
+          - S3 buckets (frontend, lambda-artifacts, data-exports, terraform-state)
+          - VPC primitives (VPC, subnets, IGW, public/private route tables minus the NAT route, security groups)
+          - IAM roles
+          - SNS topic
+          - CloudWatch log groups
+
+          Re-spin: dispatch terraform.yml or merge an infra PR to main.
+          EOF
