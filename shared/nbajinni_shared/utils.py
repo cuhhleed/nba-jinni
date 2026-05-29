@@ -305,6 +305,7 @@ async def ingest_schedule(session, season):
                     "away_team_id": game["awayTeam_teamId"],
                     "game_date": game_date,
                     "tipoff_at": tipoff_at,
+                    "game_type": "regular",
                 },
             )
         )
@@ -373,6 +374,7 @@ async def ingest_playoff_schedule(session, season):
                     "away_team_id": game["awayTeam_teamId"],
                     "game_date": game_date,
                     "tipoff_at": tipoff_at,
+                    "game_type": "playoff",
                 },
             )
         )
