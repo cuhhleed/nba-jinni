@@ -18,8 +18,10 @@ from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.player_game_stats import PlayerGameStat
+from nbajinni_shared.models.player_playoff_season_averages import PlayerPlayoffSeasonAverage
 from nbajinni_shared.models.player_season_averages import PlayerSeasonAverage
 from nbajinni_shared.models.players import Player
+from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
 from nbajinni_shared.models.seasons import Season
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.team_game_stats import TeamGameStat
@@ -145,6 +147,7 @@ async def test_game(session, test_season, test_home_team, test_away_team):
         tipoff_at=datetime(2024, 10, 1, 19, 0),
         season=test_season.season,
         status=3,
+        game_type="regular",
     )
     session.add(game)
     await session.flush()
@@ -161,6 +164,7 @@ async def test_upcoming_game(session, test_season, test_home_team, test_away_tea
         tipoff_at=datetime(2099, 12, 31, 19, 0),
         season=test_season.season,
         status=1,
+        game_type="regular",
     )
     session.add(game)
     await session.flush()
@@ -225,6 +229,7 @@ async def test_home_team_game_stat(session, test_season, test_game, test_home_te
         game_id=test_game.id,
         team_id=test_home_team.id,
         season=test_season.season,
+        game_type="regular",
         points=110,
         opponent_points=102,
         rebounds=45,
@@ -247,6 +252,7 @@ async def test_away_team_game_stat(session, test_season, test_game, test_away_te
         game_id=test_game.id,
         team_id=test_away_team.id,
         season=test_season.season,
+        game_type="regular",
         points=102,
         opponent_points=110,
         rebounds=38,
@@ -272,6 +278,7 @@ async def test_player_game_stat(
         player_id=test_player.id,
         season=test_season.season,
         team_id=test_home_team.id,
+        game_type="regular",
         pos="SF",
         min=36,
         points=30,
@@ -369,6 +376,105 @@ async def test_away_team_season_average(session, test_season, test_away_team):
         fg_pct=0.440,
         three_pct=0.350,
         ft_pct=0.750,
+    )
+    session.add(avg)
+    await session.flush()
+    return avg
+
+
+@pytest_asyncio.fixture
+async def test_playoff_game(session, test_season, test_home_team, test_away_team):
+    game = Game(
+        id="0042300001",
+        home_team_id=test_home_team.id,
+        away_team_id=test_away_team.id,
+        game_date=date(2024, 4, 20),
+        tipoff_at=datetime(2024, 4, 20, 20, 0),
+        season=test_season.season,
+        status=3,
+        game_type="playoff",
+    )
+    session.add(game)
+    await session.flush()
+    return game
+
+
+@pytest_asyncio.fixture
+async def test_playoff_game_metadata(session, test_playoff_game):
+    metadata = PlayoffGameMetadata(
+        game_id=test_playoff_game.id,
+        round=1,
+        series_game_number=1,
+        series_record="0-0",
+    )
+    session.add(metadata)
+    await session.flush()
+    return metadata
+
+
+@pytest_asyncio.fixture
+async def test_player_playoff_game_stat(
+    session, test_season, test_playoff_game, test_player, test_home_team
+):
+    stat = PlayerGameStat(
+        game_id=test_playoff_game.id,
+        player_id=test_player.id,
+        season=test_season.season,
+        team_id=test_home_team.id,
+        game_type="playoff",
+        pos="SF",
+        min=36,
+        points=30,
+        fgm=11,
+        fga=20,
+        ftm=6,
+        fta=8,
+        tpm=2,
+        tpa=5,
+        off_reb=1,
+        def_reb=7,
+        tot_reb=8,
+        asts=10,
+        stls=2,
+        blks=1,
+        tos=3,
+        pfs=2,
+        fgp=55.00,
+        ftp=75.00,
+        tpp=40.00,
+        plus_minus=12,
+    )
+    session.add(stat)
+    await session.flush()
+    return stat
+
+
+@pytest_asyncio.fixture
+async def test_player_playoff_season_average(session, test_season, test_player):
+    avg = PlayerPlayoffSeasonAverage(
+        season=test_season.season,
+        player_id=test_player.id,
+        games_played=15,
+        min_pg=36.00,
+        points_pg=27.50,
+        fgm_pg=10.00,
+        fga_pg=20.00,
+        ftm_pg=6.00,
+        fta_pg=8.00,
+        tpm_pg=1.50,
+        tpa_pg=4.00,
+        off_reb_pg=1.00,
+        def_reb_pg=6.00,
+        tot_reb_pg=7.00,
+        asts_pg=8.00,
+        stls_pg=1.50,
+        blks_pg=0.80,
+        tos_pg=3.00,
+        pfs_pg=2.00,
+        fgp=50.00,
+        ftp=75.00,
+        tpp=37.50,
+        plus_minus_pg=5.00,
     )
     session.add(avg)
     await session.flush()

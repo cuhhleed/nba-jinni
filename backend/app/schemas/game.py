@@ -16,6 +16,14 @@ class GameBase(BaseModel):
     game_date: date
     status: int
     tipoff_at: datetime
+    game_type: Literal["regular", "playoff"]
+
+
+class PlayoffMetadata(BaseModel):
+    round: int
+    series_game_number: int
+    series_record: str
+    model_config = ConfigDict(from_attributes=True)
 
 
 def _split_team_stats(data: object) -> object:
@@ -46,6 +54,7 @@ def _split_team_stats(data: object) -> object:
         "game_date": data.game_date,
         "tipoff_at": data.tipoff_at,
         "status": data.status,
+        "game_type": data.game_type,
         "home_team_stat": home_stat,
         "away_team_stat": away_stat,
     }
@@ -53,6 +62,8 @@ def _split_team_stats(data: object) -> object:
         payload["home_team"] = data.home_team
     if "away_team" in data.__dict__:
         payload["away_team"] = data.away_team
+    if "playoff_metadata" in data.__dict__:
+        payload["playoff_metadata"] = data.playoff_metadata
     return payload
 
 
@@ -75,6 +86,7 @@ class GamePreview(GameBase):
     kind: Literal["preview"] = "preview"
     home_team: "TeamWithStandingAndAverage"
     away_team: "TeamWithStandingAndAverage"
+    playoff_metadata: Optional[PlayoffMetadata] = None
 
 
 class GameResult(GameBase):
@@ -92,6 +104,7 @@ class GameResult(GameBase):
     away_team: "TeamWithStanding"
     home_team_stat: "TeamGameStatBase"
     away_team_stat: "TeamGameStatBase"
+    playoff_metadata: Optional[PlayoffMetadata] = None
 
     @model_validator(mode="before")
     @classmethod

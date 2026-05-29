@@ -1,5 +1,8 @@
+import os
+
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from nbajinni_shared.logging import configure_logging, get_logger
 from sqlalchemy import text
@@ -14,6 +17,23 @@ configure_logging()
 logger = get_logger("backend_api")
 
 app = FastAPI()
+
+allowed_origins = [
+    o.strip()
+    for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(players.router)
 app.include_router(teams.router)
 app.include_router(games.router)
