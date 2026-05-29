@@ -1,36 +1,26 @@
 name: Frontend Deploy
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'frontend/**'
-      - 'scripts/deploy_frontend.sh'
-      - '.github/workflows/frontend.yml'
   pull_request:
     paths:
       - 'frontend/**'
       - 'scripts/deploy_frontend.sh'
       - '.github/workflows/frontend.yml'
-  workflow_run:
-    workflows: ['Terraform CI']
-    types: [completed]
+  push:
     branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'scripts/deploy_frontend.sh'
+      - '.github/workflows/frontend.yml'
   workflow_dispatch:
-    inputs:
-      target_environment:
-        description: 'Target environment'
-        required: true
-        default: dev
-        type: choice
-        options:
-          - dev
-          - prod
 
 permissions:
   id-token: write
   contents: read
+
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   AWS_REGION: us-east-1
@@ -60,10 +50,7 @@ jobs:
           npm run build
 
   deploy-dev:
-    if: |
-      github.event_name != 'pull_request' &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
-      (github.event_name != 'workflow_dispatch' || inputs.target_environment == 'dev')
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     environment: dev
     concurrency:
@@ -96,7 +83,7 @@ jobs:
         run: bash scripts/deploy_frontend.sh
 
   deploy-prod:
-    if: github.event_name == 'workflow_dispatch' && inputs.target_environment == 'prod'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: prod
     concurrency:
