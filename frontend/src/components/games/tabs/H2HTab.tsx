@@ -26,16 +26,30 @@ function H2HGameRow({ game }: { game: GameWithTeamStats }) {
         <TeamLogo size="sm" teamId={game.home_team_id} />
       </div>
       {isCompleted ? (
-        <span
-          className={`text-xs sm:text-sm font-brand font-medium text-center ${
-            homeStat.points > awayStat.points
-              ? "text-green-500"
-              : homeStat.points < awayStat.points
+        <span className={`text-xs sm:text-sm font-brand font-medium text-center`}>
+          <span
+            className={`${
+              homeStat.points > awayStat.points
+                ? "text-green-500"
+                : homeStat.points < awayStat.points
+                  ? "text-red-600"
+                  : "text-sky-600"
+            }`}
+          >
+            {homeStat.points}
+          </span>
+          –
+          <span
+            className={`${
+              homeStat.points > awayStat.points
                 ? "text-red-600"
-                : "text-sky-600"
-          }`}
-        >
-          {homeStat.points}–{awayStat.points}
+                : homeStat.points < awayStat.points
+                  ? "text-green-500"
+                  : "text-sky-600"
+            }`}
+          >
+            {awayStat.points}
+          </span>
         </span>
       ) : (
         <span className="text-[10px] sm:text-xs text-sky-600 text-center">
