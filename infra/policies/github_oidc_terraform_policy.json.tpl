@@ -8,6 +8,7 @@
         "iam:CreateRole",
         "iam:DeleteRole",
         "iam:GetRole",
+        "iam:GetUser",
         "iam:UpdateRole",
         "iam:UpdateAssumeRolePolicy",
         "iam:PassRole",
