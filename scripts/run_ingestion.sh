@@ -7,7 +7,7 @@ cd "$PROJECT_ROOT"
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <job>" >&2
-    echo "Jobs: nightly, roster, schedule, first-start" >&2
+    echo "Jobs: nightly, roster, schedule, playoff-schedule, first-start" >&2
     exit 1
 fi
 

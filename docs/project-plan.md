@@ -586,10 +586,10 @@ _As a developer, I want a heartbeat from the local-cron ingestion job so silent 
 
 Tasks:
 
-- [ ] On successful local-cron ingestion run, publish a `IngestionHeartbeat` custom metric via `aws cloudwatch put-metric-data`
-- [ ] Provision a CloudWatch alarm that fires if no heartbeat is observed within (ingestion frequency + buffer) hours
-- [ ] Create a dedicated IAM user for the heartbeat with narrow scope (`cloudwatch:PutMetricData` only); store credentials on the local box
-- [ ] Document setup steps in `LOCAL_OPERATIONS.md`
+- [x] On successful local-cron ingestion run, publish a `IngestionHeartbeat` custom metric via `aws cloudwatch put-metric-data`
+- [x] Provision a CloudWatch alarm that fires if no heartbeat is observed within (ingestion frequency + buffer) hours
+- [x] Create a dedicated IAM user for the heartbeat with narrow scope (`cloudwatch:PutMetricData` only); store credentials on the local box
+- [x] Document setup steps in `LOCAL_OPERATIONS.md`
 
 ---
 
