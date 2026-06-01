@@ -34,6 +34,7 @@
       ],
       "Resource": [
         "arn:aws:iam::${account_id}:role/${project_name}-${environment}-*",
+        "arn:aws:iam::${account_id}:user/${project_name}-${environment}-*",
         "arn:aws:iam::${account_id}:policy/${project_name}-${environment}-*"
       ]
     },
