@@ -57,3 +57,15 @@ output "alerts_sns_topic_arn" {
   description = "ARN of the SNS topic that receives alarm notifications."
   value       = module.observability.sns_topic_arn
 }
+
+output "cron_runner_access_key_id" {
+  description = "Access key ID for the local cron runner IAM user."
+  value       = aws_iam_access_key.cron_runner.id
+  sensitive   = true
+}
+
+output "cron_runner_secret_access_key" {
+  description = "Secret access key for the local cron runner IAM user."
+  value       = aws_iam_access_key.cron_runner.secret
+  sensitive   = true
+}

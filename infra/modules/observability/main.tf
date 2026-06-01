@@ -102,6 +102,32 @@ resource "aws_cloudwatch_metric_alarm" "loader_failure" {
   }
 }
 
+locals {
+  ingestion_jobs = {
+    nightly            = { period = 3600, eval = 3, description = "nightly hourly within game window (3h consecutive miss)", treat_missing = "missing" }
+    roster             = { period = 86400, eval = 7, description = "roster weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
+    schedule           = { period = 86400, eval = 7, description = "schedule weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
+    "playoff-schedule" = { period = 86400, eval = 7, description = "playoff-schedule weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_heartbeat" {
+  for_each            = local.ingestion_jobs
+  alarm_name          = "${var.project_name}-${var.environment}-ingestion-heartbeat-${each.key}"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = each.value.eval
+  datapoints_to_alarm = each.value.eval
+  threshold           = 1
+  treat_missing_data  = each.value.treat_missing
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_description   = "No IngestionHeartbeat for ${each.key} - ${each.value.description}."
+  metric_name         = "IngestionHeartbeat"
+  namespace           = "NBAJinni/Ingestion"
+  statistic           = "Sum"
+  period              = each.value.period
+  dimensions          = { JobName = each.key }
+}
+
 # RDS connection saturation alarm.
 # 60 connections ≈ 70% of db.t3.micro max (~85). Fires over 2 consecutive
 # 5-minute windows so transient spikes during deploys don't page.
@@ -196,6 +222,25 @@ resource "aws_cloudwatch_dashboard" "overview" {
           period = 300
           metrics = [
             ["AWS/CloudFront", "5xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global", { stat = "Average" }],
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 24
+        height = 6
+        properties = {
+          title  = "Ingestion heartbeats per job"
+          region = var.aws_region
+          view   = "timeSeries"
+          period = 3600
+          metrics = [
+            ["NBAJinni/Ingestion", "IngestionHeartbeat", "JobName", "nightly", { stat = "Sum" }],
+            ["NBAJinni/Ingestion", "IngestionHeartbeat", "JobName", "roster", { stat = "Sum" }],
+            ["NBAJinni/Ingestion", "IngestionHeartbeat", "JobName", "schedule", { stat = "Sum" }],
+            ["NBAJinni/Ingestion", "IngestionHeartbeat", "JobName", "playoff-schedule", { stat = "Sum" }],
           ]
         }
       },

@@ -242,6 +242,28 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_attach" {
   policy_arn = aws_iam_policy.lambda_s3.arn
 }
 
+resource "aws_iam_user" "cron_runner" {
+  name = "${var.project_name}-${var.environment}-cron-runner"
+  tags = { Name = "${var.project_name}-${var.environment}-cron-runner" }
+}
+
+resource "aws_iam_access_key" "cron_runner" {
+  user = aws_iam_user.cron_runner.name
+}
+
+resource "aws_iam_policy" "cron_runner" {
+  name = "${var.project_name}-${var.environment}-cron-runner-policy"
+  policy = templatefile("${path.root}/../../policies/cron_runner_policy.json.tpl", {
+    bucket_arn        = module.s3_data_exports.bucket_arn
+    loader_lambda_arn = module.lambda_loader.arn
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "cron_runner" {
+  user       = aws_iam_user.cron_runner.name
+  policy_arn = aws_iam_policy.cron_runner.arn
+}
+
 module "lambda_loader" {
   source = "../../modules/lambda"
 
