@@ -104,10 +104,10 @@ resource "aws_cloudwatch_metric_alarm" "loader_failure" {
 
 locals {
   ingestion_jobs = {
-    nightly            = { period = 3600,  eval = 3,  description = "nightly hourly within game window (3h consecutive miss)", treat_missing = "missing" }
-    roster             = { period = 86400, eval = 7,  description = "roster weekly (7-day window, CloudWatch max for daily period)",          treat_missing = "breaching" }
-    schedule           = { period = 86400, eval = 7,  description = "schedule weekly (7-day window, CloudWatch max for daily period)",        treat_missing = "breaching" }
-    "playoff-schedule" = { period = 86400, eval = 7,  description = "playoff-schedule weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
+    nightly            = { period = 3600, eval = 3, description = "nightly hourly within game window (3h consecutive miss)", treat_missing = "missing" }
+    roster             = { period = 86400, eval = 7, description = "roster weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
+    schedule           = { period = 86400, eval = 7, description = "schedule weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
+    "playoff-schedule" = { period = 86400, eval = 7, description = "playoff-schedule weekly (7-day window, CloudWatch max for daily period)", treat_missing = "breaching" }
   }
 }
 
