@@ -63,10 +63,10 @@ function buildRecentGame(game: GameWithTeamStats, teamId: number) {
         className="grid grid-cols-3 items-center pl-4 hover:bg-amber-500/10"
       >
         <span className="text-sm text-gray-900">{game.game_date}</span>
-        <TeamLogo size="sm" teamId={oppTeamStat.team_id} />
         <span className={won ? "text-green-500" : "text-red-600"}>
           {myTeamStat.points}-{oppTeamStat.points}
         </span>
+        <TeamLogo size="sm" teamId={oppTeamStat.team_id} />
       </Link>
     );
   }
@@ -74,7 +74,7 @@ function buildRecentGame(game: GameWithTeamStats, teamId: number) {
 
 function buildNextGames(nextGames: GameBase[], teamId: number) {
   if (!nextGames || nextGames.length == 0) {
-    return <EmptyState />;
+    return <EmptyState message="No upcoming games." />;
   } else {
     return (
       <div className="next-games-container">

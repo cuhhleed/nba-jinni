@@ -28,10 +28,10 @@ export AWS_PROFILE AWS_REGION DATA_BUCKET_NAME
 (cd ingestion && poetry run python cli.py "$JOB")
 
 # Step 2: Export — reads local PostgreSQL and writes JSON to staging area
-poetry run python scripts/export_to_json.py
+(cd scripts && poetry run python export_to_json.py)
 
 # Step 3: Upload — syncs staging JSON to the S3 data-exports bucket
-poetry run python scripts/upload_to_s3.py
+(cd scripts && poetry run python upload_to_s3.py)
 
 # Step 4: Invoke Loader asynchronously — Lambda picks up the new S3 objects
 aws lambda invoke \

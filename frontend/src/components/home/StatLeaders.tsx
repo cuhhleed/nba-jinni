@@ -40,7 +40,7 @@ export default function StatLeaders() {
   return (
     <div>
       <CarpetBadge className="p-4 mb-7 flex flex-col items-center gap-3">
-        <h2 className="text-xl font-brand text-sky-600">Stat Leaders</h2>
+        <h2 className="text-xl font-brand text-amber-500">Stat Leaders</h2>
         <PillTabs
           tabs={TABS}
           activeTab={activeTab}

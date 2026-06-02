@@ -22,7 +22,7 @@ export default function Top10Standings() {
   return (
     <div>
       <CarpetBadge className="p-4 mb-7 flex items-center justify-between">
-        <h2 className="text-xl font-brand text-sky-600">Top 10</h2>
+        <h2 className="text-xl font-brand text-amber-500">Top 10</h2>
         <Link
           to="/standings"
           className="text-xs text-amber-500 hover:text-amber-300 underline-offset-2 hover:underline transition-colors"

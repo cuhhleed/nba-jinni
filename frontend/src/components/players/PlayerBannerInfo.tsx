@@ -21,13 +21,13 @@ export default function PlayerBannerInfo() {
       hidden = "invisible";
     }
     return (
-      <div className="player-banner-container relative flex flex-col items-center text-sky-600">
+      <div className="player-banner-container relative flex flex-col items-center text-amber-500">
         <Link
           to={`/teams/${playerTeamId}`}
           className={`absolute top-0 left-0 group hover:bg-amber-500 flex flex-col items-center ${hidden} rounded-md`}
         >
           <TeamLogo teamId={playerTeamId} size="sm" />
-          <span className="text-center text-xs group-hover:text-gray-900">
+          <span className="text-center text-xs group-hover:text-sky-600">
             {playerInfo.team.code}
           </span>
         </Link>

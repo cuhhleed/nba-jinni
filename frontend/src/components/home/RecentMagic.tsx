@@ -8,9 +8,7 @@ export default function RecentMagic() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-amber-500 text-center mb-4">
-        Recent Magic
-      </h2>
+      <h2 className="text-2xl font-bold text-sky-600 text-center mb-4">Recent Magic</h2>
 
       {isLoading && (
         <div className="flex justify-center py-6">
