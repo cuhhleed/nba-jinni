@@ -17,12 +17,12 @@ export default function SearchResults() {
 
   return (
     <PageContainer>
-      <h1 className="text-2xl text-center text-gray-900 font-semibold font-brand mb-1">
+      <h1 className="text-2xl text-center text-sky-600 font-semibold font-brand mb-1">
         Player Search
       </h1>
       <p className="text-center text-sm text-gray-500 mb-6">
         Results for:{" "}
-        <span className="text-sky-600 font-medium">&ldquo;{q}&rdquo;</span>
+        <span className="text-amber-500 font-medium">&ldquo;{q}&rdquo;</span>
       </p>
 
       {!players || players.length === 0 ? (
@@ -33,7 +33,7 @@ export default function SearchResults() {
             <CarpetBadge
               key={player.id}
               size="sm"
-              className="p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center hover:bg-amber-500 m-2"
+              className="p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center group hover:bg-amber-500 m-2"
               hoverable
             >
               <Link to={`/players/${player.id}`}>
@@ -42,7 +42,7 @@ export default function SearchResults() {
                   alt={`${player.first_name} ${player.last_name}`}
                   className="mx-auto mb-1 sm:mb-2"
                 />
-                <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-sky-500">
+                <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-amber-500 group-hover:text-sky-600">
                   {player.first_name} {player.last_name}
                 </h2>
               </Link>

@@ -27,7 +27,7 @@ function buildAverages(averages: TeamSeasonAverage | null) {
   } else {
     return (
       <div className="stats-tab-container grid grid-cols-7 my-8">
-        <h2 className="col-span-7 lg:text-2xl text-gray-900 text-center">
+        <h2 className="col-span-7 lg:text-2xl text-sky-600 text-center">
           {averages.season} Statistics
         </h2>
         <div className="big-3-container grid grid-cols-3 col-span-5 col-start-2">

@@ -47,7 +47,7 @@ export default function TeamStandingWidget({ standing }: Props) {
       to={`/standings`}
       className="team-standing-container p-2 sm:p-3 lg:p-4 rounded-lg grid grid-cols-2 group"
     >
-      <h3 className="text-center text-[10px] sm:text-xl lg:text-2xl font-brand text-sky-600 col-span-2">
+      <h3 className="text-center text-[10px] sm:text-xl lg:text-2xl font-brand text-amber-500 col-span-2">
         {standing?.season} Standing
       </h3>
       <StatBubble

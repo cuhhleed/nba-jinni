@@ -43,7 +43,7 @@ export default function TeamDetail() {
                   alt={teamInfo.name}
                   className="mx-auto mb-1 mt-6"
                 ></TeamLogo>
-                <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-sky-600 text-center mt-4">
+                <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-amber-500 text-center mt-4">
                   {teamInfo.name}
                   <h3 className="text-xs sm:text-sm font-light text-sky-600 text-center">
                     ({teamInfo.code})

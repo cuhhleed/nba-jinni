@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import PageContainer from "../components/layout/PageContainer";
+import AveragesTab from "../components/players/AveragesTab";
 import Last5GamesTab from "../components/players/Last5GamesTab";
 import PlayerBannerInfo from "../components/players/PlayerBannerInfo";
 import PlayerStatRankingsWidget from "../components/players/PlayerStatRankingsWidget";
-import PlayerStatsTab from "../components/players/PlayerStatsTab";
 import VsTeamTab from "../components/players/VsTeamTab";
 import CarpetBadge from "../components/ui/CarpetBadge";
 import EmptyState from "../components/ui/EmptyState";
@@ -42,7 +42,7 @@ export default function PlayerDetail() {
       </CarpetBadge>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        <PlayerStatsTab />
+        <AveragesTab />
         <div className="col-span-2 flex flex-col mt-8">
           <div className="flex justify-center">
             <PillTabs

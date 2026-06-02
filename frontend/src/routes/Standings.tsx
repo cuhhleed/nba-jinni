@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { formatStreak } from "../lib/format";
 import PageContainer from "../components/layout/PageContainer";
 import TeamLogo from "../components/teams/TeamLogo";
 import CarpetBadge from "../components/ui/CarpetBadge";
@@ -10,6 +9,7 @@ import LoadingPage from "../components/ui/LoadingPage";
 import PillTabs from "../components/ui/PillTabs";
 import { useStandings } from "../hooks/useStandings";
 import { useTeams } from "../hooks/useTeams";
+import { formatStreak } from "../lib/format";
 import type { Standing } from "../types/teams";
 
 type TabId = "east" | "west" | "all";
@@ -124,8 +124,8 @@ export default function Standings() {
     <PageContainer>
       <CarpetBadge className="p-4 flex flex-col items-center gap-3">
         <div className="text-center">
-          <h1 className="text-2xl font-brand text-sky-600">NBA Standings</h1>
-          {season && <p className="text-xs text-amber-500 mt-0.5">{season}</p>}
+          <h1 className="text-2xl font-brand text-amber-500">NBA Standings</h1>
+          {season && <p className="text-xs text-sky-600 mt-0.5">{season}</p>}
         </div>
         <PillTabs
           tabs={TABS}
