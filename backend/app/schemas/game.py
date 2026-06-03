@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from ._types import UTCDatetime
 
 
 class GameBase(BaseModel):
@@ -15,14 +17,14 @@ class GameBase(BaseModel):
     season: str
     game_date: date
     status: int
-    tipoff_at: datetime
+    tipoff_at: UTCDatetime
     game_type: Literal["regular", "playoff"]
 
 
 class PlayoffMetadata(BaseModel):
-    round: int
+    round_label: Optional[str] = None
     series_game_number: int
-    series_record: str
+    series_record: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -176,8 +178,12 @@ class GameLive(BaseModel):
     game_status_text: str
     home_player_stats: list[PlayerLiveStat]
     away_player_stats: list[PlayerLiveStat]
-    last_updated_at: datetime
+    home_team_stat: "TeamGameStatBase"
+    away_team_stat: "TeamGameStatBase"
+    last_updated_at: UTCDatetime
     is_stale: bool
+    playoff_metadata: Optional[PlayoffMetadata] = None
+    is_final: bool = False
 
 
 class LiveScoreboardEntry(BaseModel):
@@ -189,13 +195,13 @@ class LiveScoreboardEntry(BaseModel):
     period: int | None
     game_clock: str | None
     game_status_text: str
-    tipoff_at: datetime
+    tipoff_at: UTCDatetime
     state: Literal["scheduled", "live", "final"]
 
 
 class LiveScoreboardResponse(BaseModel):
     games: list[LiveScoreboardEntry]
-    last_updated_at: datetime
+    last_updated_at: UTCDatetime
     is_stale: bool
 
 

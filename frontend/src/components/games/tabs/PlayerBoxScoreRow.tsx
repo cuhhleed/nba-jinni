@@ -5,9 +5,9 @@ type Props = {
   player: PlayerGameBoxScore;
 };
 
-const COL_GRID =
+export const COL_GRID =
   "grid w-fit sm:w-full lg:w-full grid-cols-[9rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem_3rem_3rem_3rem_3rem] sm:grid-cols-[1fr_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem_3rem_3rem_3rem_3rem]";
-const CELL = "text-xs text-gray-900 text-center self-center px-1";
+export const CELL = "text-xs text-gray-900 text-center self-center px-1";
 
 export function BoxScoreHeader() {
   return (

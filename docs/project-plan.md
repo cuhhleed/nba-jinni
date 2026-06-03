@@ -620,7 +620,7 @@ Tasks:
 - [ ] Ensure no secrets are hardcoded — all credentials via Secrets Manager or environment variables
 - [ ] Add rate limiting to the FastAPI backend (via `slowapi`)
 - [ ] Confirm RDS has no public inbound access (VPC only)
-- [ ] Set appropriate JWT expiry (e.g. 24 hours) and handle expired token errors gracefully on frontend
+- [ ] ~~Set appropriate JWT expiry (e.g. 24 hours) and handle expired token errors gracefully on frontend~~
 - [ ] Review S3 bucket policy — ensure only CloudFront can read objects (Origin Access Control)
 
 ---

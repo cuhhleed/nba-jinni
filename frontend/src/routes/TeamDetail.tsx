@@ -4,7 +4,7 @@ import PageContainer from "../components/layout/PageContainer";
 import TeamStandingWidget from "../components/standings/TeamStandingWidget";
 import GamesTab from "../components/teams/GamesTab";
 import RosterTab from "../components/teams/RosterTab";
-import StatsTab from "../components/teams/StatsTab";
+import TeamAveragesTab from "../components/teams/TeamAveragesTab";
 import TeamLogo from "../components/teams/TeamLogo";
 import CarpetBadge from "../components/ui/CarpetBadge";
 import ErrorPage from "../components/ui/ErrorPage";
@@ -55,7 +55,7 @@ export default function TeamDetail() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3">
-            <StatsTab />
+            <TeamAveragesTab />
 
             <div className="tab-window-container flex flex-col col-span-2 max-h-[44vh]">
               <div className="flex justify-center mt-6">

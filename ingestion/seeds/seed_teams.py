@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 configure_logging()
 logger = get_logger("teams_seeding")
 
+
 async def main(env="dev"):
     logger.info("seeding_teams", environment=env)
     teams = get_teams()
@@ -63,11 +64,13 @@ async def upsert_teams(teams, conference_map, env):
                 try:
                     result = await session.execute(stmt)
                 except Exception as e:
-                    logger.error("player_insert_failed",
-                                    team_id=team["id"],
-                                    team_name=team["full_name"],
-                                    environment=env,
-                                    error=str(e))
+                    logger.error(
+                        "player_insert_failed",
+                        team_id=team["id"],
+                        team_name=team["full_name"],
+                        environment=env,
+                        error=str(e),
+                    )
                     raise
 
                 if result.rowcount == 1:
@@ -75,11 +78,15 @@ async def upsert_teams(teams, conference_map, env):
                 else:
                     skipped += 1
 
-    logger.info("team_seeding_completed", 
-                message=f"Teams Seeding Completed. Teams seeded: {inserted} inserted, {skipped} already existed")
+    logger.info(
+        "team_seeding_completed",
+        message=f"Teams Seeding Completed. Teams seeded: {inserted} inserted, {skipped} already existed",
+    )
+
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--env")
     args = parser.parse_args()

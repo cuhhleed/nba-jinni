@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { BrowserRouter, Route, Routes } from "react-router";
 import Navbar from "./components/layout/Navbar";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
@@ -10,7 +11,23 @@ import Standings from "./routes/Standings";
 import TeamDetail from "./routes/TeamDetail";
 import Teams from "./routes/Teams";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if (
+          isAxiosError(error) &&
+          error.response &&
+          error.response.status >= 400 &&
+          error.response.status < 500
+        ) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+    },
+  },
+});
 
 function App() {
   return (

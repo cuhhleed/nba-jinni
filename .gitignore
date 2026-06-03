@@ -73,5 +73,10 @@ layer/
 data/exports/
 loader/dist/
 
+# ── Dev script artifacts ─────────────────────────────────
+scripts/dev/fixtures/PLAYOFF*.json
+!scripts/dev/fixtures/live_playoff_game.json
+!scripts/dev/fixtures/final_playoff_game.json
+
 .claude/
 CLAUDE.md

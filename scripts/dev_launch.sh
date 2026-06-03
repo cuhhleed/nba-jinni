@@ -3,6 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Point the backend at the local dummy-game fixtures so /games/live/{game_id}
+# serves PLAYOFF001.json instead of hitting the real NBA API. Exporting here
+# (rather than relying on the caller's shell) guarantees the uvicorn child
+# process inherits it. See docs/LOCAL_OPERATIONS.md.
+export NBAJINNI_LIVE_FIXTURE_DIR="$SCRIPT_DIR/dev/fixtures"
+
 cleanup() {
   echo ""
   echo "Shutting down..."

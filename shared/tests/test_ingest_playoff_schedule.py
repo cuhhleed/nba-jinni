@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import date
 from unittest.mock import patch
 from sqlalchemy import select
 
@@ -34,7 +35,7 @@ async def test_ingest_playoff_schedule_inserts_games_with_playoff_type(
             "game_datetime_utc": "2025-04-20T20:00:00Z",
             "game_status": 3,
             "game_label": "1st Round",
-            "series_game_number": 1,
+            "series_game_number": "Game 1",
             "series_text": "LAL leads 1-0",
         },
     ])
@@ -62,7 +63,7 @@ async def test_ingest_playoff_schedule_inserts_metadata(
             "game_datetime_utc": "2025-05-05T20:00:00Z",
             "game_status": 3,
             "game_label": "Conf. Semifinals",
-            "series_game_number": 3,
+            "series_game_number": "Game 3",
             "series_text": "BOS leads 2-1",
         },
     ])
@@ -75,7 +76,7 @@ async def test_ingest_playoff_schedule_inserts_metadata(
 
     meta = metadata_rows[0]
     assert meta.game_id == "0042400002"
-    assert meta.round == 2
+    assert meta.round_label == "Conf. Semifinals"
     assert meta.series_game_number == 3
     assert meta.series_record == "BOS leads 2-1"
 
@@ -91,7 +92,7 @@ async def test_ingest_playoff_schedule_upserts_existing_metadata(
             "game_datetime_utc": "2025-05-15T20:00:00Z",
             "game_status": 3,
             "game_label": "Conf. Finals",
-            "series_game_number": 2,
+            "series_game_number": "Game 2",
             "series_text": "LAL leads 2-0",
         },
     ])
@@ -103,7 +104,7 @@ async def test_ingest_playoff_schedule_upserts_existing_metadata(
             "game_datetime_utc": "2025-05-15T20:00:00Z",
             "game_status": 3,
             "game_label": "Conf. Finals",
-            "series_game_number": 2,
+            "series_game_number": "Game 2",
             "series_text": "BOS leads 2-1",
         },
     ])
@@ -130,7 +131,7 @@ async def test_ingest_playoff_schedule_skips_tbd_placeholder_teams(
             "game_datetime_utc": "2025-06-04T00:30:00Z",
             "game_status": 1,
             "game_label": "NBA Finals",
-            "series_game_number": 1,
+            "series_game_number": "Game 1",
             "series_text": "",
         },
         {
@@ -140,7 +141,7 @@ async def test_ingest_playoff_schedule_skips_tbd_placeholder_teams(
             "game_datetime_utc": "2025-06-07T00:30:00Z",
             "game_status": 1,
             "game_label": "NBA Finals",
-            "series_game_number": 2,
+            "series_game_number": "Game 2",
             "series_text": "",
         },
         {
@@ -150,7 +151,7 @@ async def test_ingest_playoff_schedule_skips_tbd_placeholder_teams(
             "game_datetime_utc": "2025-04-20T20:00:00Z",
             "game_status": 3,
             "game_label": "1st Round",
-            "series_game_number": 1,
+            "series_game_number": "Game 1",
             "series_text": "LAL leads 1-0",
         },
     ])
@@ -185,7 +186,7 @@ async def test_ingest_playoff_schedule_skips_non_playoff_ids(
             "game_datetime_utc": "2025-04-20T20:00:00Z",
             "game_status": 3,
             "game_label": "1st Round",
-            "series_game_number": 1,
+            "series_game_number": "Game 1",
             "series_text": "LAL leads 1-0",
         },
     ])
@@ -198,3 +199,30 @@ async def test_ingest_playoff_schedule_skips_non_playoff_ids(
     rows = (await session.execute(select(Game))).scalars().all()
     assert len(rows) == 1
     assert rows[0].id == "0042400010"
+
+
+async def test_ingest_playoff_schedule_game_date_is_et_calendar_day(
+    session, test_season, test_home_team, test_away_team
+):
+    """A 00:30 UTC tipoff on 2025-06-04 is still June 3 in Eastern Time."""
+    mock_df = make_playoff_schedule_df([
+        {
+            "game_id": "0042400501",
+            "home_team_id": test_home_team.id,
+            "away_team_id": test_away_team.id,
+            "game_datetime_utc": "2025-06-04T00:30:00Z",
+            "game_status": 3,
+            "game_label": "NBA Finals",
+            "series_game_number": "Game 1",
+            "series_text": "Series tied 0-0",
+        },
+    ])
+
+    with patch("nbajinni_shared.utils.wrapper.call", return_value=[mock_df]):
+        processed = await ingest_playoff_schedule(session, test_season.season)
+
+    assert processed == 1
+
+    rows = (await session.execute(select(Game))).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].game_date == date(2025, 6, 3)

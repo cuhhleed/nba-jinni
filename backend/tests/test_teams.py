@@ -1,5 +1,5 @@
 """
-Happy-path tests for GET /teams/{team_id}/games.
+Tests for GET /teams/{team_id}/games and GET /teams/{team_id}/season-average.
 """
 
 import pytest
@@ -61,3 +61,46 @@ async def test_get_team_games_includes_game_type(
         assert "game_type" in game
     for game in data["upcoming"]:
         assert "game_type" in game
+
+
+@pytest.mark.asyncio
+async def test_get_team_season_average_regular(
+    client, test_home_team, test_home_team_season_average
+):
+    """Regular season average present → 200 with matching team_id and season."""
+    response = await client.get(f"/teams/{test_home_team.id}/season-average")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["team_id"] == test_home_team.id
+    assert data["season"] == test_home_team_season_average.season
+
+
+@pytest.mark.asyncio
+async def test_get_team_season_average_playoff(
+    client, test_home_team, test_home_team_playoff_season_average
+):
+    """Playoff average present → 200 with matching team_id and season."""
+    response = await client.get(
+        f"/teams/{test_home_team.id}/season-average?type=playoff"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["team_id"] == test_home_team.id
+    assert data["season"] == test_home_team_playoff_season_average.season
+
+
+@pytest.mark.asyncio
+async def test_get_team_season_average_playoff_missing(client, test_home_team):
+    """Team exists but has no playoff row → 200 with null body."""
+    response = await client.get(
+        f"/teams/{test_home_team.id}/season-average?type=playoff"
+    )
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+@pytest.mark.asyncio
+async def test_get_team_season_average_not_found(client):
+    """Team does not exist → 404."""
+    response = await client.get("/teams/9999999/season-average")
+    assert response.status_code == 404

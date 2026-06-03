@@ -1,5 +1,7 @@
 import asyncio
+import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from nba_api.stats.endpoints import CommonAllPlayers
 from nba_api.stats.endpoints import ScheduleLeagueV2
@@ -22,6 +24,7 @@ from sqlalchemy import select, func, exists, update
 
 logger = get_logger("ingestion")
 wrapper = NbaApiWrapper()
+_NBA_TZ = ZoneInfo("America/New_York")
 
 class InvalidGameData(ValueError):
     pass
@@ -284,8 +287,9 @@ async def ingest_schedule(session, season):
         if game["gameLabel"]:
             continue
 
-        tipoff_at = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00")).replace(tzinfo=None)
-        game_date = tipoff_at.date()
+        dt_utc = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00"))
+        tipoff_at = dt_utc.replace(tzinfo=None)
+        game_date = dt_utc.astimezone(_NBA_TZ).date()
         stmt = (
             insert(Game)
             .values(
@@ -315,22 +319,6 @@ async def ingest_schedule(session, season):
 
     return processed
 
-def _parse_playoff_round(game_label: str) -> int:
-    # Why: nba_api does not expose a documented enum for gameLabel values;
-    # this is a string-based fallback mapping that must be validated against
-    # real schedule data before relying on it in production.
-    label = game_label.strip()
-    if label in ("1st Round",):
-        return 1
-    if label in ("Conf. Semifinals", "Conference Semifinals"):
-        return 2
-    if label in ("Conf. Finals", "Conference Finals"):
-        return 3
-    if label in ("NBA Finals",):
-        return 4
-    return 0
-
-
 async def ingest_playoff_schedule(session, season):
     games = await get_all_games(season)
     processed = 0
@@ -346,8 +334,9 @@ async def ingest_playoff_schedule(session, season):
             logger.info("playoff_game_tbd_skipped", game_id=game["gameId"])
             continue
 
-        tipoff_at = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00")).replace(tzinfo=None)
-        game_date = tipoff_at.date()
+        dt_utc = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00"))
+        tipoff_at = dt_utc.replace(tzinfo=None)
+        game_date = dt_utc.astimezone(_NBA_TZ).date()
 
         stmt = (
             insert(Game)
@@ -383,28 +372,27 @@ async def ingest_playoff_schedule(session, season):
             processed += 1
 
         series_game_number_raw = game.get("seriesGameNumber", None)
-        try:
-            series_game_number = int(series_game_number_raw) if series_game_number_raw is not None else 0
-        except (ValueError, TypeError):
-            series_game_number = 0
+        m = re.search(r'\d+', str(series_game_number_raw or ""))
+        series_game_number = int(m.group()) if m else 0
 
         series_record_raw = game.get("seriesText", None)
         series_record = series_record_raw if series_record_raw else "0-0"
 
-        round_number = _parse_playoff_round(str(game.get("gameLabel", "") or ""))
+        round_label_raw = game.get("gameLabel", None)
+        round_label = str(round_label_raw).strip() if round_label_raw else None
 
         meta_stmt = (
             insert(PlayoffGameMetadata)
             .values(
                 game_id=game["gameId"],
-                round=round_number,
+                round_label=round_label,
                 series_game_number=series_game_number,
                 series_record=series_record,
             )
             .on_conflict_do_update(
                 index_elements=["game_id"],
                 set_={
-                    "round": round_number,
+                    "round_label": round_label,
                     "series_game_number": series_game_number,
                     "series_record": series_record,
                 },

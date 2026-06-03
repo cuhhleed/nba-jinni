@@ -2,6 +2,7 @@ import { useParams } from "react-router";
 import { usePlayerSeasonPlayoffAverage } from "../../hooks/usePlayerSeasonPlayoffAverage";
 import type { PlayerSeasonAverage } from "../../types/players";
 import EmptyState from "../ui/EmptyState";
+import ErrorState from "../ui/ErrorState";
 import LoadingState from "../ui/LoadingState";
 import StatBubble from "../ui/StatBubble";
 
@@ -17,16 +18,16 @@ export default function PlayerPlayoffStatsTab() {
   if (isLoading) {
     return <LoadingState />;
   } else if (error) {
-    return <EmptyState message="No playoff statistics to load."></EmptyState>;
-  } else if (playerPlayoffAverages) {
-    const averages = buildAverages(playerPlayoffAverages);
+    return <ErrorState />;
+  } else {
+    const averages = buildAverages(playerPlayoffAverages ?? null);
     return averages;
   }
 }
 
 function buildAverages(averages: PlayerSeasonAverage | null) {
   if (!averages) {
-    return <EmptyState />;
+    return <EmptyState message="No playoff statistics available." />;
   } else {
     return (
       <div className="stats-tab-container grid grid-cols-7 my-8">

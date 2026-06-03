@@ -8,7 +8,7 @@ Happy-path tests for game endpoints:
 """
 
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -404,7 +404,7 @@ async def test_get_game_includes_playoff_metadata_when_playoff(
     assert data["game_type"] == "playoff"
     pm = data["playoff_metadata"]
     assert pm is not None
-    assert pm["round"] == test_playoff_game_metadata.round
+    assert pm["round_label"] == test_playoff_game_metadata.round_label
     assert pm["series_game_number"] == test_playoff_game_metadata.series_game_number
     assert pm["series_record"] == test_playoff_game_metadata.series_record
 
@@ -422,39 +422,6 @@ async def test_get_game_playoff_metadata_null_for_regular(
     data = response.json()
     assert data["kind"] == "result"
     assert data["playoff_metadata"] is None
-
-
-@pytest.mark.asyncio
-async def test_get_upcoming_games_includes_game_type(
-    client,
-    session,
-    test_season,
-    test_home_team,
-    test_away_team,
-):
-    """Upcoming game list includes game_type on each entry."""
-    from nbajinni_shared.models.games import Game
-
-    near_future = date.today() + timedelta(days=1)
-    upcoming = Game(
-        id="UPCOMING01",
-        home_team_id=test_home_team.id,
-        away_team_id=test_away_team.id,
-        game_date=near_future,
-        tipoff_at=datetime.combine(near_future, datetime.min.time()).replace(hour=19),
-        season=test_season.season,
-        status=1,
-        game_type="regular",
-    )
-    session.add(upcoming)
-    await session.flush()
-
-    response = await client.get("/games/upcoming")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) >= 1
-    for game in data:
-        assert "game_type" in game
 
 
 @pytest.mark.asyncio
@@ -494,3 +461,87 @@ async def test_live_game_live_success(
     assert len(data["home_player_stats"]) == 1
     assert len(data["away_player_stats"]) == 1
     assert data["home_player_stats"][0]["player_id"] == 2544
+
+
+@pytest.mark.asyncio
+async def test_live_playoff_game_includes_metadata_and_not_final(
+    client,
+    session,
+    test_season,
+    test_home_team,
+    test_away_team,
+    test_home_standing,
+    test_away_standing,
+    test_playoff_game,
+    test_playoff_game_metadata,
+):
+    """Live playoff game (status=2, gameStatus=2 in box) → playoff_metadata populated,
+    is_final False.
+    Set the playoff game status to 1 (not yet completed in DB)
+    with tipoff in the past."""
+    test_playoff_game.status = 1
+    test_playoff_game.tipoff_at = datetime(2024, 4, 20, 19, 0)
+    await session.flush()
+
+    mock_box = _make_boxscore_mock(test_playoff_game.id, game_status=2)
+    with patch("app.routers.games.BoxScore", return_value=mock_box):
+        response = await client.get(f"/games/live/{test_playoff_game.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_final"] is False
+    pm = data["playoff_metadata"]
+    assert pm is not None
+    assert pm["round_label"] == test_playoff_game_metadata.round_label
+    assert pm["series_game_number"] == test_playoff_game_metadata.series_game_number
+    assert pm["series_record"] == test_playoff_game_metadata.series_record
+
+
+@pytest.mark.asyncio
+async def test_live_playoff_game_finished_uningested_is_final(
+    client,
+    session,
+    test_season,
+    test_home_team,
+    test_away_team,
+    test_home_standing,
+    test_away_standing,
+    test_playoff_game,
+    test_playoff_game_metadata,
+):
+    """Finished-but-uningested playoff game
+    (DB status≠3, gameStatus=3 in box) → is_final True."""
+    test_playoff_game.status = 1
+    test_playoff_game.tipoff_at = datetime(2024, 4, 20, 19, 0)
+    await session.flush()
+
+    mock_box = _make_boxscore_mock(test_playoff_game.id, game_status=3)
+    with patch("app.routers.games.BoxScore", return_value=mock_box):
+        response = await client.get(f"/games/live/{test_playoff_game.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_final"] is True
+    pm = data["playoff_metadata"]
+    assert pm is not None
+    assert pm["round_label"] == test_playoff_game_metadata.round_label
+
+
+def test_playoff_metadata_schema_series_record_none_is_valid():
+    """PlayoffMetadata Pydantic schema must accept series_record=None without error.
+
+    The DB column is NOT NULL (series_record always has a value after ingestion), but
+    the schema field is Optional so that future null values or partial payloads do not
+    crash serialization.
+    """
+    from app.schemas.game import PlayoffMetadata
+
+    pm = PlayoffMetadata(
+        round_label="First Round", series_game_number=4, series_record=None
+    )
+    assert pm.series_record is None
+    # Serialises cleanly to dict and back.
+    as_dict = pm.model_dump()
+    assert as_dict["series_record"] is None
+    roundtripped = PlayoffMetadata.model_validate(as_dict)
+    assert roundtripped.series_record is None

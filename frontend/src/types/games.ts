@@ -25,10 +25,17 @@ export type TeamWithStandingAndAverage = Team & {
   season_averages: TeamSeasonAverage[];
 };
 
+export type PlayoffMetadata = {
+  round_label: string | null;
+  series_game_number: number;
+  series_record: string | null;
+};
+
 export type GamePreview = GameBase & {
   kind: "preview";
   home_team: TeamWithStandingAndAverage;
   away_team: TeamWithStandingAndAverage;
+  playoff_metadata: PlayoffMetadata | null;
 };
 
 export type GameResult = GameBase & {
@@ -37,6 +44,7 @@ export type GameResult = GameBase & {
   away_team: TeamWithStanding;
   home_team_stat: TeamGameStat;
   away_team_stat: TeamGameStat;
+  playoff_metadata: PlayoffMetadata | null;
 };
 
 export type PlayerLiveStat = {
@@ -70,8 +78,12 @@ export type GameLive = {
   game_status_text: string;
   home_player_stats: PlayerLiveStat[];
   away_player_stats: PlayerLiveStat[];
+  home_team_stat: TeamGameStat;
+  away_team_stat: TeamGameStat;
   last_updated_at: string;
   is_stale: boolean;
+  playoff_metadata: PlayoffMetadata | null;
+  is_final: boolean;
 };
 
 export type GameDetailResponse = GamePreview | GameResult | GameLive;
@@ -114,6 +126,7 @@ export type GameBase = {
   game_date: string;
   status: number;
   tipoff_at: string;
+  game_type: "regular" | "playoff";
 };
 
 export type GameWithTeamStats = GameBase & {

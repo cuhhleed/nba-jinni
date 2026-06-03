@@ -4,15 +4,16 @@ import GameBanner from "../components/games/GameBanner";
 import GameComparisonStats from "../components/games/GameComparisonStats";
 import BoxScoreTab from "../components/games/tabs/BoxScoreTab";
 import H2HTab from "../components/games/tabs/H2HTab";
+import LiveBoxScoreTab from "../components/games/tabs/LiveBoxScoreTab";
 import PreviewLast5Tab from "../components/games/tabs/PreviewLast5Tab";
 import PageContainer from "../components/layout/PageContainer";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorPage from "../components/ui/ErrorPage";
+import FreshnessBadge from "../components/ui/FreshnessBadge";
 import LoadingPage from "../components/ui/LoadingPage";
 import PillTabs from "../components/ui/PillTabs";
-import GameLiveDisplay from "../components/games/GameLiveDisplay";
 import { useGameDetail } from "../hooks/useGameDetail";
-import type { GamePreview, GameResult } from "../types/games";
+import type { GameLive, GamePreview, GameResult } from "../types/games";
 
 const PREVIEW_TABS = [
   { id: "h2h", label: "H2H" },
@@ -24,8 +25,14 @@ const RESULT_TABS = [
   { id: "h2h", label: "H2H" },
 ] as const;
 
+const LIVE_TABS = [
+  { id: "box", label: "Box Score" },
+  { id: "h2h", label: "H2H" },
+] as const;
+
 type PreviewTabId = (typeof PREVIEW_TABS)[number]["id"];
 type ResultTabId = (typeof RESULT_TABS)[number]["id"];
+type LiveTabId = (typeof LIVE_TABS)[number]["id"];
 
 function PreviewTabContent({
   game,
@@ -67,12 +74,33 @@ function ResultTabContent({
   }
 }
 
+function LiveTabContent({
+  game,
+  activeTab,
+}: {
+  game: GameLive;
+  activeTab: LiveTabId;
+}) {
+  switch (activeTab) {
+    case "box":
+      return <LiveBoxScoreTab game={game} />;
+    case "h2h":
+      return (
+        <H2HTab
+          homeTeamId={game.home_team.id}
+          awayTeamId={game.away_team.id}
+        />
+      );
+  }
+}
+
 export default function GameDetail() {
   const { id } = useParams();
   const gameId = id ?? "";
 
   const [previewTab, setPreviewTab] = useState<PreviewTabId>("h2h");
   const [resultTab, setResultTab] = useState<ResultTabId>("box");
+  const [liveTab, setLiveTab] = useState<LiveTabId>("box");
 
   const { data: game, isLoading, error } = useGameDetail(gameId);
 
@@ -80,17 +108,19 @@ export default function GameDetail() {
   if (error) return <ErrorPage />;
   if (!game) return <EmptyState />;
 
-  if (game.kind === "live") {
-    return (
-      <PageContainer>
-        <GameLiveDisplay game={game} />
-      </PageContainer>
-    );
-  }
-
   return (
     <PageContainer>
       <GameBanner game={game} />
+
+      {game.kind === "live" && (
+        <div className="flex justify-center mt-2">
+          <FreshnessBadge
+            isStale={game.is_stale}
+            lastUpdatedAt={game.last_updated_at}
+            size="sm"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <GameComparisonStats game={game} />
@@ -104,6 +134,13 @@ export default function GameDetail() {
                 activeTab={previewTab}
                 onChange={setPreviewTab}
               />
+            ) : game.kind === "live" ? (
+              <PillTabs
+                className="bg-gray-900"
+                tabs={LIVE_TABS}
+                activeTab={liveTab}
+                onChange={setLiveTab}
+              />
             ) : (
               <PillTabs
                 className="bg-gray-900"
@@ -116,6 +153,8 @@ export default function GameDetail() {
           <div className="mt-4">
             {game.kind === "preview" ? (
               <PreviewTabContent game={game} activeTab={previewTab} />
+            ) : game.kind === "live" ? (
+              <LiveTabContent game={game} activeTab={liveTab} />
             ) : (
               <ResultTabContent game={game} activeTab={resultTab} />
             )}

@@ -52,9 +52,7 @@ function H2HGameRow({ game }: { game: GameWithTeamStats }) {
           </span>
         </span>
       ) : (
-        <span className="text-[10px] sm:text-xs text-sky-600 text-center">
-          Upcoming
-        </span>
+        <span className="text-[10px] sm:text-xs text-gray-900 text-center">VS</span>
       )}
       <div className="flex items-center justify-start gap-1">
         <TeamLogo size="sm" teamId={game.away_team_id} />

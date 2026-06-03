@@ -410,7 +410,7 @@ async def test_playoff_game(session, test_home_team, test_away_team):
 async def test_playoff_game_metadata(session, test_playoff_game):
     metadata = PlayoffGameMetadata(
         game_id=test_playoff_game.id,
-        round=1,
+        round_label="First Round",
         series_game_number=1,
         series_record="0-0",
     )

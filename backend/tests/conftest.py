@@ -27,6 +27,7 @@ from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
 from nbajinni_shared.models.seasons import Season
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.team_game_stats import TeamGameStat
+from nbajinni_shared.models.team_playoff_season_averages import TeamPlayoffSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.teams import Team
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -36,6 +37,13 @@ from app.main import app
 from app.routers.games import _live_cache
 
 load_dotenv()
+
+
+@pytest.fixture(autouse=True)
+def _unset_live_fixture_dir(monkeypatch):
+    # The dev-only seam in get_live_game short-circuits before the patched
+    # BoxScore mock runs. Ensure tests are isolated from the developer's shell.
+    monkeypatch.delenv("NBAJINNI_LIVE_FIXTURE_DIR", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -363,6 +371,28 @@ async def test_home_team_season_average(session, test_season, test_home_team):
 
 
 @pytest_asyncio.fixture
+async def test_home_team_playoff_season_average(session, test_season, test_home_team):
+    avg = TeamPlayoffSeasonAverage(
+        team_id=test_home_team.id,
+        season=test_season.season,
+        games_played=10,
+        points=112.0,
+        opponent_points=105.5,
+        rebounds=42.0,
+        assists=22.0,
+        steals=7.0,
+        blocks=4.0,
+        turnovers=11.0,
+        fg_pct=0.455,
+        three_pct=0.370,
+        ft_pct=0.800,
+    )
+    session.add(avg)
+    await session.flush()
+    return avg
+
+
+@pytest_asyncio.fixture
 async def test_away_team_season_average(session, test_season, test_away_team):
     avg = TeamSeasonAverage(
         team_id=test_away_team.id,
@@ -405,7 +435,7 @@ async def test_playoff_game(session, test_season, test_home_team, test_away_team
 async def test_playoff_game_metadata(session, test_playoff_game):
     metadata = PlayoffGameMetadata(
         game_id=test_playoff_game.id,
-        round=1,
+        round_label="First Round",
         series_game_number=1,
         series_record="0-0",
     )

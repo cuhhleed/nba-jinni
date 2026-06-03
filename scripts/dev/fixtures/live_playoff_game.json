@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "version": 1,
+    "code": 200,
+    "request": "http://nba.cloud/games/PLAYOFF001/boxscore?Format=json",
+    "time": "2025-05-01 22:00:00.000000"
+  },
+  "game": {
+    "gameId": "PLAYOFF001",
+    "gameTimeLocal": "2025-05-01T18:00:00-04:00",
+    "gameTimeUTC": "2025-05-01T22:00:00Z",
+    "gameEt": "2025-05-01T18:00:00-04:00",
+    "gameStatus": 2,
+    "gameStatusText": "Q3 5:30",
+    "period": 3,
+    "gameClock": "PT05M30.00S",
+    "gameLabel": "First Round",
+    "seriesText": "Series tied 1-1",
+    "regulationPeriods": 4,
+    "attendance": 19060,
+    "sellout": "1",
+    "arena": {
+      "arenaId": 1,
+      "arenaName": "Crypto.com Arena",
+      "arenaCity": "Los Angeles",
+      "arenaState": "CA",
+      "arenaCountry": "US",
+      "arenaTimezone": "America/Los_Angeles"
+    },
+    "officials": [],
+    "homeTeam": {
+      "teamId": 1610612747,
+      "teamName": "Lakers",
+      "teamCity": "Los Angeles",
+      "teamTricode": "LAL",
+      "score": 88,
+      "inBonus": "0",
+      "timeoutsRemaining": 3,
+      "periods": [
+        {"period": 1, "periodType": "REGULAR", "score": 28},
+        {"period": 2, "periodType": "REGULAR", "score": 30},
+        {"period": 3, "periodType": "REGULAR", "score": 30}
+      ],
+      "players": [
+        {
+          "status": "ACTIVE", "order": 1, "personId": 2544, "jerseyNum": "23", "position": "SF",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "LeBron", "familyName": "James", "name": "LeBron James", "nameI": "L. James",
+          "statistics": {
+            "points": 25, "reboundsTotal": 8, "assists": 7, "steals": 1, "blocks": 1, "turnovers": 2,
+            "fieldGoalsMade": 10, "fieldGoalsAttempted": 18,
+            "threePointersMade": 2, "threePointersAttempted": 5,
+            "freeThrowsMade": 3, "freeThrowsAttempted": 4,
+            "minutes": "PT30M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 2, "personId": 203076, "jerseyNum": "3", "position": "PF",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Anthony", "familyName": "Davis", "name": "Anthony Davis", "nameI": "A. Davis",
+          "statistics": {
+            "points": 18, "reboundsTotal": 9, "assists": 1, "steals": 1, "blocks": 2, "turnovers": 1,
+            "fieldGoalsMade": 7, "fieldGoalsAttempted": 14,
+            "threePointersMade": 0, "threePointersAttempted": 1,
+            "freeThrowsMade": 4, "freeThrowsAttempted": 5,
+            "minutes": "PT28M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 3, "personId": 1630559, "jerseyNum": "15", "position": "SG",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Austin", "familyName": "Reaves", "name": "Austin Reaves", "nameI": "A. Reaves",
+          "statistics": {
+            "points": 14, "reboundsTotal": 3, "assists": 4, "steals": 1, "blocks": 0, "turnovers": 2,
+            "fieldGoalsMade": 5, "fieldGoalsAttempted": 11,
+            "threePointersMade": 2, "threePointersAttempted": 5,
+            "freeThrowsMade": 2, "freeThrowsAttempted": 2,
+            "minutes": "PT26M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 4, "personId": 1626156, "jerseyNum": "1", "position": "PG",
+          "starter": "1", "oncourt": "0", "played": "1",
+          "firstName": "D'Angelo", "familyName": "Russell", "name": "D'Angelo Russell", "nameI": "D. Russell",
+          "statistics": {
+            "points": 12, "reboundsTotal": 2, "assists": 5, "steals": 0, "blocks": 0, "turnovers": 1,
+            "fieldGoalsMade": 4, "fieldGoalsAttempted": 10,
+            "threePointersMade": 2, "threePointersAttempted": 6,
+            "freeThrowsMade": 2, "freeThrowsAttempted": 2,
+            "minutes": "PT22M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 5, "personId": 1629060, "jerseyNum": "28", "position": "PF",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Rui", "familyName": "Hachimura", "name": "Rui Hachimura", "nameI": "R. Hachimura",
+          "statistics": {
+            "points": 10, "reboundsTotal": 5, "assists": 1, "steals": 0, "blocks": 0, "turnovers": 1,
+            "fieldGoalsMade": 4, "fieldGoalsAttempted": 8,
+            "threePointersMade": 1, "threePointersAttempted": 2,
+            "freeThrowsMade": 1, "freeThrowsAttempted": 2,
+            "minutes": "PT24M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 6, "personId": 1629216, "jerseyNum": "7", "position": "PG",
+          "starter": "0", "oncourt": "0", "played": "1",
+          "firstName": "Gabe", "familyName": "Vincent", "name": "Gabe Vincent", "nameI": "G. Vincent",
+          "statistics": {
+            "points": 6, "reboundsTotal": 1, "assists": 2, "steals": 1, "blocks": 0, "turnovers": 1,
+            "fieldGoalsMade": 2, "fieldGoalsAttempted": 6,
+            "threePointersMade": 1, "threePointersAttempted": 3,
+            "freeThrowsMade": 1, "freeThrowsAttempted": 1,
+            "minutes": "PT18M00.00S"
+          }
+        }
+      ],
+      "statistics": {
+        "points": 88, "reboundsTotal": 32, "assists": 20, "steals": 4, "blocks": 3, "turnovers": 8,
+        "fieldGoalsMade": 34, "fieldGoalsAttempted": 74,
+        "threePointersMade": 8, "threePointersAttempted": 22,
+        "freeThrowsMade": 12, "freeThrowsAttempted": 15,
+        "minutes": "PT120M00.00S"
+      }
+    },
+    "awayTeam": {
+      "teamId": 1610612738,
+      "teamName": "Celtics",
+      "teamCity": "Boston",
+      "teamTricode": "BOS",
+      "score": 82,
+      "inBonus": "0",
+      "timeoutsRemaining": 2,
+      "periods": [
+        {"period": 1, "periodType": "REGULAR", "score": 26},
+        {"period": 2, "periodType": "REGULAR", "score": 28},
+        {"period": 3, "periodType": "REGULAR", "score": 28}
+      ],
+      "players": [
+        {
+          "status": "ACTIVE", "order": 1, "personId": 1628369, "jerseyNum": "0", "position": "SF",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Jayson", "familyName": "Tatum", "name": "Jayson Tatum", "nameI": "J. Tatum",
+          "statistics": {
+            "points": 22, "reboundsTotal": 6, "assists": 4, "steals": 1, "blocks": 0, "turnovers": 3,
+            "fieldGoalsMade": 8, "fieldGoalsAttempted": 19,
+            "threePointersMade": 3, "threePointersAttempted": 8,
+            "freeThrowsMade": 3, "freeThrowsAttempted": 3,
+            "minutes": "PT32M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 2, "personId": 1627759, "jerseyNum": "7", "position": "SG",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Jaylen", "familyName": "Brown", "name": "Jaylen Brown", "nameI": "J. Brown",
+          "statistics": {
+            "points": 18, "reboundsTotal": 5, "assists": 3, "steals": 2, "blocks": 0, "turnovers": 2,
+            "fieldGoalsMade": 7, "fieldGoalsAttempted": 15,
+            "threePointersMade": 2, "threePointersAttempted": 6,
+            "freeThrowsMade": 2, "freeThrowsAttempted": 2,
+            "minutes": "PT30M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 3, "personId": 204001, "jerseyNum": "8", "position": "C",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Kristaps", "familyName": "Porzingis", "name": "Kristaps Porzingis", "nameI": "K. Porzingis",
+          "statistics": {
+            "points": 14, "reboundsTotal": 7, "assists": 1, "steals": 0, "blocks": 1, "turnovers": 2,
+            "fieldGoalsMade": 5, "fieldGoalsAttempted": 11,
+            "threePointersMade": 2, "threePointersAttempted": 5,
+            "freeThrowsMade": 2, "freeThrowsAttempted": 2,
+            "minutes": "PT26M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 4, "personId": 201950, "jerseyNum": "4", "position": "PG",
+          "starter": "1", "oncourt": "0", "played": "1",
+          "firstName": "Jrue", "familyName": "Holiday", "name": "Jrue Holiday", "nameI": "J. Holiday",
+          "statistics": {
+            "points": 10, "reboundsTotal": 3, "assists": 5, "steals": 1, "blocks": 0, "turnovers": 1,
+            "fieldGoalsMade": 4, "fieldGoalsAttempted": 9,
+            "threePointersMade": 2, "threePointersAttempted": 5,
+            "freeThrowsMade": 0, "freeThrowsAttempted": 0,
+            "minutes": "PT24M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 5, "personId": 1628401, "jerseyNum": "9", "position": "SG",
+          "starter": "1", "oncourt": "1", "played": "1",
+          "firstName": "Derrick", "familyName": "White", "name": "Derrick White", "nameI": "D. White",
+          "statistics": {
+            "points": 8, "reboundsTotal": 2, "assists": 3, "steals": 1, "blocks": 0, "turnovers": 1,
+            "fieldGoalsMade": 3, "fieldGoalsAttempted": 8,
+            "threePointersMade": 1, "threePointersAttempted": 3,
+            "freeThrowsMade": 1, "freeThrowsAttempted": 2,
+            "minutes": "PT22M00.00S"
+          }
+        },
+        {
+          "status": "ACTIVE", "order": 6, "personId": 201143, "jerseyNum": "42", "position": "PF",
+          "starter": "0", "oncourt": "0", "played": "1",
+          "firstName": "Al", "familyName": "Horford", "name": "Al Horford", "nameI": "A. Horford",
+          "statistics": {
+            "points": 6, "reboundsTotal": 4, "assists": 1, "steals": 0, "blocks": 1, "turnovers": 1,
+            "fieldGoalsMade": 2, "fieldGoalsAttempted": 5,
+            "threePointersMade": 0, "threePointersAttempted": 1,
+            "freeThrowsMade": 2, "freeThrowsAttempted": 2,
+            "minutes": "PT20M00.00S"
+          }
+        }
+      ],
+      "statistics": {
+        "points": 82, "reboundsTotal": 28, "assists": 18, "steals": 5, "blocks": 2, "turnovers": 11,
+        "fieldGoalsMade": 30, "fieldGoalsAttempted": 72,
+        "threePointersMade": 10, "threePointersAttempted": 28,
+        "freeThrowsMade": 12, "freeThrowsAttempted": 14,
+        "minutes": "PT120M00.00S"
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy import ForeignKey
@@ -13,7 +13,7 @@ class PlayoffGameMetadata(Base):
     __tablename__ = "playoff_game_metadata"
 
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), primary_key=True)
-    round: Mapped[int] = mapped_column()
+    round_label: Mapped[Optional[str]] = mapped_column()
     series_game_number: Mapped[int] = mapped_column()
     series_record: Mapped[str] = mapped_column()
 
