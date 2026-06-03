@@ -27,6 +27,7 @@ from nbajinni_shared.models.playoff_game_metadata import PlayoffGameMetadata
 from nbajinni_shared.models.seasons import Season
 from nbajinni_shared.models.standings import Standing
 from nbajinni_shared.models.team_game_stats import TeamGameStat
+from nbajinni_shared.models.team_playoff_season_averages import TeamPlayoffSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.teams import Team
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -356,6 +357,28 @@ async def test_home_team_season_average(session, test_season, test_home_team):
         fg_pct=0.465,
         three_pct=0.380,
         ft_pct=0.810,
+    )
+    session.add(avg)
+    await session.flush()
+    return avg
+
+
+@pytest_asyncio.fixture
+async def test_home_team_playoff_season_average(session, test_season, test_home_team):
+    avg = TeamPlayoffSeasonAverage(
+        team_id=test_home_team.id,
+        season=test_season.season,
+        games_played=10,
+        points=112.0,
+        opponent_points=105.5,
+        rebounds=42.0,
+        assists=22.0,
+        steals=7.0,
+        blocks=4.0,
+        turnovers=11.0,
+        fg_pct=0.455,
+        three_pct=0.370,
+        ft_pct=0.800,
     )
     session.add(avg)
     await session.flush()

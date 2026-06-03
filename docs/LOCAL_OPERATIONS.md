@@ -89,6 +89,8 @@ PATH=/usr/local/bin:/usr/bin:/bin
 0 8 * * 0 /path/to/nba-jinni/scripts/run_cron_sync.sh playoff-schedule >> /var/log/nba-jinni/playoff-schedule.log 2>&1
 ```
 
+> **Cadence — schedule on a fixed weekday, not on days of the month.** The `roster`, `schedule`, and `playoff-schedule` jobs run weekly on a fixed weekday (Sunday) by design. Avoid day-of-month patterns such as `0 8 1,15 * *`: they produce uneven 14–17 day gaps, and they carry a start-up gotcha — if you install the crontab *after* the 1st has passed, the first run slips to the 15th. During the playoffs that gap can drop a freshly-decided series from the schedule for up to two weeks: this is exactly how the 2025-26 Finals matchup went un-ingested until the gap was noticed. A fixed-weekday cron keeps a consistent 7-day cadence, which is also the maximum window the heartbeat alarms can cover (see [Per-job alarms](#per-job-alarms)).
+
 ### Logging cron output
 
 Log files are written to `/var/log/nba-jinni/<job>.log` as shown in the crontab block above.

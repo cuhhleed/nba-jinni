@@ -1,5 +1,5 @@
 from datetime import date as date_type
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from nbajinni_shared.logging import configure_logging, get_logger
@@ -202,7 +202,8 @@ async def get_recent_top_performances(
 
 
 @router.get(
-    "/players/{player_id}/season-average", response_model=PlayerSeasonAverageBase
+    "/players/{player_id}/season-average",
+    response_model=Optional[PlayerSeasonAverageBase],
 )
 async def get_player_season_average(
     player_id: int,
@@ -225,13 +226,7 @@ async def get_player_season_average(
         .limit(1)
     )
 
-    row = (await db.execute(stmt)).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No {type} season average data found for this player.",
-        )
-    return row
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 @router.get(

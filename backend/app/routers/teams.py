@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.games import Game
 from nbajinni_shared.models.players import Player
+from nbajinni_shared.models.team_playoff_season_averages import TeamPlayoffSeasonAverage
 from nbajinni_shared.models.team_season_averages import TeamSeasonAverage
 from nbajinni_shared.models.teams import Team
 from sqlalchemy import and_, or_, select
@@ -12,6 +15,7 @@ from ..dependencies import get_current_season, get_db
 from ..schemas.game import GameWithTeamStats, TeamScheduleResponse
 from ..schemas.player import PlayerBase
 from ..schemas.team import TeamBase, TeamStatsResponse, TeamWithStanding
+from ..schemas.team_season_average import TeamSeasonAverageBase
 
 configure_logging()
 logger = get_logger("backend_api")
@@ -77,6 +81,29 @@ async def get_team_stats(team_id: int, db: AsyncSession = Depends(get_db)):
         season_average=season_average,
         recent_game_stats=[GameWithTeamStats.model_validate(g) for g in recent_games],
     )
+
+
+@router.get(
+    "/teams/{team_id}/season-average",
+    response_model=Optional[TeamSeasonAverageBase],
+)
+async def get_team_season_average(
+    team_id: int,
+    type: Literal["regular", "playoff"] = Query("regular"),
+    db: AsyncSession = Depends(get_db),
+):
+    team_exists = await db.scalar(select(Team.id).where(Team.id == team_id))
+    if team_exists is None:
+        raise HTTPException(status_code=404, detail="Team not found.")
+
+    avg_model = TeamPlayoffSeasonAverage if type == "playoff" else TeamSeasonAverage
+    stmt = (
+        select(avg_model)
+        .where(avg_model.team_id == team_id)
+        .order_by(avg_model.season.desc())
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 @router.get("/teams/{team_id}/roster", response_model=list[PlayerBase])

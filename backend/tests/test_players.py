@@ -149,14 +149,15 @@ async def test_get_player_season_averages_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_get_player_season_average_type_playoff_returns_404_when_missing(
+async def test_get_player_season_average_type_playoff_returns_null_when_missing(
     client, test_player
 ):
-    """Player exists but has no playoff averages row → 404, not 500."""
+    """Player exists but has no playoff averages row → 200 with null body."""
     response = await client.get(
         f"/players/{test_player.id}/season-average?type=playoff"
     )
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() is None
 
 
 @pytest.mark.asyncio

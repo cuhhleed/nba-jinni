@@ -37,6 +37,7 @@ export AWS_PROFILE AWS_REGION DATA_BUCKET_NAME
 aws lambda invoke \
     --function-name "$LOADER_FN" \
     --invocation-type Event \
+    --payload '{"action":"load"}' \
     --region "$AWS_REGION" \
     /tmp/loader-invoke-${JOB}.json
 
