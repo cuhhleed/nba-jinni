@@ -7,6 +7,7 @@ from nbajinni_shared.logging import configure_logging, get_logger
 configure_logging()
 logger = get_logger("pre_ingestion_seeding")
 
+
 async def main(env="dev"):
     logger.info("seeding_started", environment=env)
     await seed_seasons(env=env)
@@ -15,8 +16,10 @@ async def main(env="dev"):
 
     logger.info("seeding_complete", environment=env)
 
+
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="dev")
     args = parser.parse_args()

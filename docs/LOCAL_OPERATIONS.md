@@ -176,3 +176,70 @@ The `nightly` alarm uses `treat_missing_data = "missing"` (vs. `"breaching"` for
 4. Add the crontab entries (see [Crontab Setup](#crontab-setup) above).
 5. Create the log directory (`sudo mkdir -p /var/log/nba-jinni && sudo chown $USER /var/log/nba-jinni`).
 6. Confirm the first heartbeat appears in the CloudWatch console under `NBAJinni/Ingestion`.
+
+---
+
+## Simulating live/finished-uningested playoff games
+
+Use the seed script and fixture files under `scripts/dev/` to test the live game page with playoff context locally — without waiting for a real playoff game to tip off.
+
+### Prerequisites
+
+- `DATABASE_URL` must resolve to your local dev database.
+- Run all commands from the `scripts/` directory using Poetry.
+
+### 1. Seed the dummy game
+
+```bash
+# Live in-progress playoff game (gameStatus=2 in fixture)
+poetry run python dev/seed_dummy_playoff_game.py --state live
+
+# Finished-but-uningested playoff game (gameStatus=3 in fixture)
+poetry run python dev/seed_dummy_playoff_game.py --state final
+```
+
+Both commands insert (or replace) a `Game` row with `id="PLAYOFF001"`, `game_type="playoff"`, `status=1`, and a matching `PlayoffGameMetadata` row. The script also detects the dev DB's current season (`MAX(standings.season)`) and inserts synthetic `Standing` rows for LAL and BOS in that season if missing — without them the `GameBanner` W–L badge would not render. The DB status is intentionally left at 1 so the `/games/live/{game_id}` endpoint serves the game rather than the 409 "Game is final" guard.
+
+### 2. Point the backend at the fixture files
+
+When `NBAJINNI_LIVE_FIXTURE_DIR` is set, the live endpoint reads `{NBAJINNI_LIVE_FIXTURE_DIR}/PLAYOFF001.json` instead of calling the real NBA API.
+
+**If you launch via `scripts/dev_launch.sh`, this is already handled** — the script exports `NBAJINNI_LIVE_FIXTURE_DIR="$SCRIPT_DIR/dev/fixtures"` for you, so the uvicorn child process always picks up the fixtures. No manual step needed.
+
+If you instead start the backend directly (e.g. `poetry run uvicorn app.main:app`), export the variable yourself in that same shell first:
+
+```bash
+export NBAJINNI_LIVE_FIXTURE_DIR=/path/to/nba-jinni/scripts/dev/fixtures
+```
+
+> **Use `export`, not a bare `NBAJINNI_LIVE_FIXTURE_DIR=...` assignment.** A plain assignment creates a shell variable that `echo` can read but that child processes (uvicorn) do **not** inherit, so the backend silently falls through to the real NBA API and returns 503 for the dummy game id. Verify with `printenv NBAJINNI_LIVE_FIXTURE_DIR` (prints nothing unless actually exported), and confirm the backend logs a `live_using_fixture` line before each fetch.
+
+The seed script copies the chosen state-template (`live_playoff_game.json` or `final_playoff_game.json`) to `PLAYOFF001.json` in the same directory. The env-gate looks up `{game_id}.json`, so the active fixture is whichever template was copied last:
+- `--state live`  → `live_playoff_game.json`  (contains `"gameStatus": 2`) → copied to `PLAYOFF001.json`
+- `--state final` → `final_playoff_game.json` (contains `"gameStatus": 3`) → copied to `PLAYOFF001.json`
+
+Re-running the seed with a different `--state` swaps the active fixture. The generated `PLAYOFF001.json` is gitignored.
+
+If you want to serve a different fixture for a specific game ID, add a file named `{game_id}.json` to the fixtures directory directly.
+
+### 3. Expected UI behaviour
+
+The live game page renders the same shell as a finished game (`GameBanner` + `GameComparisonStats` + tabs), but with live data:
+
+- **GameBanner**: shows the playoff round/series banner (`First Round · Game 3`, `Series tied 1-1`), team logos with W–L from the seeded standings, and a live scoreboard in the center.
+- **GameComparisonStats**: "Live Game Stats" heading, side-by-side `PairedStatBubble` rows for PTS/REB/AST/STL/BLK/TO/FG%/3P%/FT%, sourced from the live BoxScore team statistics.
+- **Tabs**: Box Score (live player rows, sorted by points desc) + H2H (regular DB query).
+
+| State | `is_final` | Banner center | Box score |
+|-------|-----------|---------------|-----------|
+| `live` | `false` | Live score (88–82) + amber `Q3 5:30` status + game clock | 6 live players per team, percentages computed from made/attempted, `+/-` shown as `—` |
+| `final` | `true` | Final score (112–104) + sky `FINAL` label + "Official box score syncing…" italic note | 6 final players per team, same columns; live cache will continue serving until the real ingest job promotes the page to a `GameResult` view |
+
+### 4. Clean up
+
+To remove the seeded game from the dev database, delete the row manually or re-run the seed script (it is idempotent — it deletes then re-inserts on each run).
+
+```sql
+DELETE FROM playoff_game_metadata WHERE game_id = 'PLAYOFF001';
+DELETE FROM games WHERE id = 'PLAYOFF001';
+```

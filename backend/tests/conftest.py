@@ -40,6 +40,13 @@ load_dotenv()
 
 
 @pytest.fixture(autouse=True)
+def _unset_live_fixture_dir(monkeypatch):
+    # The dev-only seam in get_live_game short-circuits before the patched
+    # BoxScore mock runs. Ensure tests are isolated from the developer's shell.
+    monkeypatch.delenv("NBAJINNI_LIVE_FIXTURE_DIR", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def reset_live_cache():
     """Clear the module-level StaleCache before each test to prevent
     cross-test pollution."""
@@ -428,7 +435,7 @@ async def test_playoff_game(session, test_season, test_home_team, test_away_team
 async def test_playoff_game_metadata(session, test_playoff_game):
     metadata = PlayoffGameMetadata(
         game_id=test_playoff_game.id,
-        round=1,
+        round_label="First Round",
         series_game_number=1,
         series_record="0-0",
     )
