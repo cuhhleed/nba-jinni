@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,7 +18,6 @@ from sqlalchemy.orm import selectinload
 from ..cache.stale_cache import StaleCache
 from ..dependencies import get_current_season, get_db
 from ..schemas.game import (
-    GameBase,
     GameDetailResponse,
     GameLive,
     GamePreview,
@@ -133,26 +132,6 @@ def _build_player_stat(p: dict) -> PlayerLiveStat:
         ft_attempted=stats.get("freeThrowsAttempted", 0),
         minutes=stats.get("minutes", "PT00M00.00S"),
     )
-
-
-@router.get("/games/upcoming", response_model=list[GameBase])
-async def get_upcoming_games(
-    limit: int = Query(15, ge=1, le=50),
-    days: int = Query(3, ge=1, le=30),
-    db: AsyncSession = Depends(get_db),
-):
-    date_offset = date.today() + timedelta(days=days)
-    stmt = (
-        select(Game)
-        .where(Game.game_date < date_offset, Game.game_date >= date.today())
-        .order_by(Game.game_date.asc(), Game.id.asc())
-        .limit(limit)
-    )
-
-    result = await db.execute(stmt)
-    upcoming_games = result.scalars().all()
-
-    return upcoming_games
 
 
 @router.get("/games/h2h", response_model=list[GameWithTeamStats])

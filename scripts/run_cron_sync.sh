@@ -38,6 +38,7 @@ aws lambda invoke \
     --function-name "$LOADER_FN" \
     --invocation-type Event \
     --payload '{"action":"load"}' \
+    --cli-binary-format raw-in-base64-out \
     --region "$AWS_REGION" \
     /tmp/loader-invoke-${JOB}.json
 

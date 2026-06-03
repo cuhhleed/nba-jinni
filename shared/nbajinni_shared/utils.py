@@ -1,6 +1,7 @@
 import asyncio
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from nba_api.stats.endpoints import CommonAllPlayers
 from nba_api.stats.endpoints import ScheduleLeagueV2
@@ -23,6 +24,7 @@ from sqlalchemy import select, func, exists, update
 
 logger = get_logger("ingestion")
 wrapper = NbaApiWrapper()
+_NBA_TZ = ZoneInfo("America/New_York")
 
 class InvalidGameData(ValueError):
     pass
@@ -285,8 +287,9 @@ async def ingest_schedule(session, season):
         if game["gameLabel"]:
             continue
 
-        tipoff_at = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00")).replace(tzinfo=None)
-        game_date = tipoff_at.date()
+        dt_utc = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00"))
+        tipoff_at = dt_utc.replace(tzinfo=None)
+        game_date = dt_utc.astimezone(_NBA_TZ).date()
         stmt = (
             insert(Game)
             .values(
@@ -331,8 +334,9 @@ async def ingest_playoff_schedule(session, season):
             logger.info("playoff_game_tbd_skipped", game_id=game["gameId"])
             continue
 
-        tipoff_at = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00")).replace(tzinfo=None)
-        game_date = tipoff_at.date()
+        dt_utc = datetime.fromisoformat(game["gameDateTimeUTC"].replace("Z", "+00:00"))
+        tipoff_at = dt_utc.replace(tzinfo=None)
+        game_date = dt_utc.astimezone(_NBA_TZ).date()
 
         stmt = (
             insert(Game)

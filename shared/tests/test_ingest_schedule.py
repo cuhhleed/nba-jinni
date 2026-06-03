@@ -83,6 +83,29 @@ async def test_ingest_schedule_upserts_existing_game(session, test_season, test_
     assert test_game.game_date == date(2024, 11, 1)
 
 
+async def test_ingest_schedule_game_date_is_et_calendar_day(session, test_season, test_home_team, test_away_team):
+    """A 00:30 UTC tipoff on 2025-06-04 is still June 3 in Eastern Time."""
+    mock_df = make_schedule_df([
+        {
+            "game_id": "0022400099",
+            "home_team_id": test_home_team.id,
+            "away_team_id": test_away_team.id,
+            "game_datetime_utc": "2025-06-04T00:30:00Z",
+            "game_status": 3,
+            "game_label": "",
+        },
+    ])
+
+    with patch("nbajinni_shared.utils.wrapper.call", return_value=[mock_df]):
+        processed = await ingest_schedule(session, test_season.season)
+
+    assert processed == 1
+
+    rows = (await session.execute(select(Game))).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].game_date == date(2025, 6, 3)
+
+
 async def test_ingest_schedule_skips_labeled_games(session, test_season, test_home_team, test_away_team):
     mock_df = make_schedule_df([
         {

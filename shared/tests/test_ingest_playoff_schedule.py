@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import date
 from unittest.mock import patch
 from sqlalchemy import select
 
@@ -198,3 +199,30 @@ async def test_ingest_playoff_schedule_skips_non_playoff_ids(
     rows = (await session.execute(select(Game))).scalars().all()
     assert len(rows) == 1
     assert rows[0].id == "0042400010"
+
+
+async def test_ingest_playoff_schedule_game_date_is_et_calendar_day(
+    session, test_season, test_home_team, test_away_team
+):
+    """A 00:30 UTC tipoff on 2025-06-04 is still June 3 in Eastern Time."""
+    mock_df = make_playoff_schedule_df([
+        {
+            "game_id": "0042400501",
+            "home_team_id": test_home_team.id,
+            "away_team_id": test_away_team.id,
+            "game_datetime_utc": "2025-06-04T00:30:00Z",
+            "game_status": 3,
+            "game_label": "NBA Finals",
+            "series_game_number": "Game 1",
+            "series_text": "Series tied 0-0",
+        },
+    ])
+
+    with patch("nbajinni_shared.utils.wrapper.call", return_value=[mock_df]):
+        processed = await ingest_playoff_schedule(session, test_season.season)
+
+    assert processed == 1
+
+    rows = (await session.execute(select(Game))).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].game_date == date(2025, 6, 3)

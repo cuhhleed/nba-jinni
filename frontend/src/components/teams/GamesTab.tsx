@@ -5,6 +5,7 @@ import EmptyState from "../ui/EmptyState";
 import ErrorPage from "../ui/ErrorPage";
 import LoadingPage from "../ui/LoadingPage";
 import TeamLogo from "./TeamLogo";
+import { formatLocalDate } from "../../lib/datetime";
 
 export default function GamesTab() {
   const { id } = useParams();
@@ -96,7 +97,7 @@ function buildNextGame(game: GameBase, teamId: number) {
       key={game.id}
       className="grid grid-cols-3 items-center pl-4 hover:bg-amber-500/10 border-b border-amber-500/20"
     >
-      <span className="text-sm text-gray-900">{game.game_date}</span>
+      <span className="text-sm text-gray-900">{formatLocalDate(game.tipoff_at)}</span>
       <span className={isHome ? "text-green-500" : "text-red-600"}>
         {isHome ? "(H)" : "(A)"}
       </span>

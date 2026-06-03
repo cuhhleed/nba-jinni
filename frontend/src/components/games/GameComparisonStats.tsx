@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { GameLive, GamePreview, GameResult } from "../../types/games";
 import { useTeamSeasonPlayoffAverage } from "../../hooks/useTeamSeasonPlayoffAverage";
+import type { GameLive, GamePreview, GameResult } from "../../types/games";
 import EmptyState from "../ui/EmptyState";
 import PillTabs from "../ui/PillTabs";
 import PairedStatBubble from "./PairedStatBubble";
@@ -11,7 +11,16 @@ type Props = {
 
 type StatDef = {
   label: string;
-  key: "points" | "rebounds" | "assists" | "steals" | "blocks" | "turnovers" | "fg_pct" | "three_pct" | "ft_pct";
+  key:
+    | "points"
+    | "rebounds"
+    | "assists"
+    | "steals"
+    | "blocks"
+    | "turnovers"
+    | "fg_pct"
+    | "three_pct"
+    | "ft_pct";
   lowerIsBetter?: boolean;
   pct?: boolean; // multiply × 100 before display
 };
@@ -22,15 +31,15 @@ const STAT_DEFS: StatDef[] = [
   { label: "AST", key: "assists" },
   { label: "STL", key: "steals" },
   { label: "BLK", key: "blocks" },
-  { label: "TO",  key: "turnovers", lowerIsBetter: true },
+  { label: "TO", key: "turnovers", lowerIsBetter: true },
   { label: "FG%", key: "fg_pct", pct: true },
   { label: "3P%", key: "three_pct", pct: true },
   { label: "FT%", key: "ft_pct", pct: true },
 ];
 
 const AVERAGE_TABS = [
-  { id: "playoffs" as const, label: "Playoffs" },
   { id: "regular" as const, label: "Regular" },
+  { id: "playoffs" as const, label: "Playoffs" },
 ] as const;
 
 type AverageTab = "playoffs" | "regular";
@@ -59,19 +68,21 @@ export default function GameComparisonStats({ game }: Props) {
       const showPlayoffs = activeTab === "playoffs";
       const homeAvg = showPlayoffs ? homePlayoffAvg.data : homeRegularAvg;
       const awayAvg = showPlayoffs ? awayPlayoffAvg.data : awayRegularAvg;
-      const isLoading = showPlayoffs && (homePlayoffAvg.isLoading || awayPlayoffAvg.isLoading);
+      const isLoading =
+        showPlayoffs && (homePlayoffAvg.isLoading || awayPlayoffAvg.isLoading);
 
       return (
         <div className="flex flex-col my-4 sm:my-6 lg:my-8">
           <div className="flex flex-col items-center mb-3 gap-2">
-            <h2 className="text-center text-[10px] sm:text-xs lg:text-sm text-gray-900 font-medium">
-              Season Averages
-            </h2>
             <PillTabs
+              className="bg-gray-900"
               tabs={AVERAGE_TABS}
               activeTab={activeTab}
               onChange={setActiveTab}
             />
+            <h2 className="text-center text-[10px] sm:text-xs lg:text-sm text-gray-900 font-medium">
+              Season Averages
+            </h2>
           </div>
           {isLoading ? (
             <div className="text-center text-xs text-gray-500 py-4">Loading…</div>

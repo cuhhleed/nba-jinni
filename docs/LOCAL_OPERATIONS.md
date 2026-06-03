@@ -111,7 +111,7 @@ Running a job locally only writes to the local database. To propagate data to th
 1. **Ingest** — Fetches from the NBA API and writes rows into local PostgreSQL.
 2. **Export** — Reads from PostgreSQL and writes JSON files to a local staging area.
 3. **Upload** — The JSON files are synced to the S3 bucket (see ADR-005 for the versioning and path conventions).
-4. **Load** — The Lambda loader detects the new S3 objects and imports them into the cloud DuckDB instance.
+4. **Load** — The Lambda loader downloads the JSON exports from S3 and performs a truncate + insert into the cloud RDS PostgreSQL instance.
 
 Steps 2–4 are now performed automatically by `run_cron_sync.sh` after the ingestion step. Use `run_ingestion.sh` only when you want to run the ingest step in isolation (local DB only, no cloud propagation).
 
@@ -176,6 +176,77 @@ The `nightly` alarm uses `treat_missing_data = "missing"` (vs. `"breaching"` for
 4. Add the crontab entries (see [Crontab Setup](#crontab-setup) above).
 5. Create the log directory (`sudo mkdir -p /var/log/nba-jinni && sudo chown $USER /var/log/nba-jinni`).
 6. Confirm the first heartbeat appears in the CloudWatch console under `NBAJinni/Ingestion`.
+
+---
+
+## Data Recovery
+
+The S3 data exports bucket is versioned with 30-day retention on non-current versions. Every successful `run_cron_sync.sh` run overwrites the JSON files in place, leaving the prior version accessible via S3 object versioning. This provides daily point-in-time recovery at no additional cost.
+
+### When to use recovery
+
+- A bad ingestion run wrote corrupt or incorrect rows and was synced to the cloud.
+- A Loader Lambda run failed mid-load, leaving tables partially populated.
+- Local PostgreSQL data was lost and you need to restore the cloud state from a known-good export.
+
+### Recovery procedure
+
+**Step 1 — Identify the last-known-good export.**
+
+Open the S3 data exports bucket in the AWS Console → select any JSON file (e.g., `exports/games.json`) → click "Versions" → find the version written before the bad run. Note the version IDs for all affected files. Alternatively, use the AWS CLI:
+
+```bash
+aws s3api list-object-versions \
+  --bucket <data-exports-bucket-name> \
+  --prefix exports/ \
+  --query 'Versions[?Key==`exports/games.json`].[VersionId,LastModified]' \
+  --output table
+```
+
+**Step 2 — Restore the prior version (if needed).**
+
+If the current files in S3 are corrupt, copy the prior version over the current one:
+
+```bash
+aws s3api copy-object \
+  --bucket <data-exports-bucket-name> \
+  --copy-source "<data-exports-bucket-name>/exports/games.json?versionId=<VERSION_ID>" \
+  --key exports/games.json
+```
+
+Repeat for each affected table file. If the most recent S3 export is still valid, skip this step.
+
+**Step 3 — Re-run migrations if the schema was affected.**
+
+If the corruption involved a bad migration:
+
+```bash
+aws lambda invoke \
+  --function-name nbajinni-dev-data-loader \
+  --payload '{"action":"migrate"}' \
+  /dev/null
+```
+
+**Step 4 — Reload from S3.**
+
+The Loader Lambda truncates all tables and reloads from whatever JSON files are currently in S3. Run this after confirming the S3 files are in the desired state:
+
+```bash
+aws lambda invoke \
+  --function-name nbajinni-dev-data-loader \
+  --payload '{"action":"load"}' \
+  /dev/null
+```
+
+**Step 5 — Verify.**
+
+Call a representative API endpoint (e.g., `/standings`) and confirm the data looks correct.
+
+### Notes
+
+- The load action always does a **full truncate + insert** across all tables in FK-safe order. There is no partial or row-level recovery — the unit of recovery is the entire export snapshot.
+- Tables are loaded in dependency order (`Season → Team → Player → Game → ...`) so FK constraints are satisfied. Truncation runs in reverse order.
+- If the local PostgreSQL container is lost, restore from S3 is not directly possible — the Loader Lambda only writes to RDS. Restore local state by re-running ingestion jobs against the NBA API (`cli.py first-start` picks up where the DB left off).
 
 ---
 

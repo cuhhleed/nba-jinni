@@ -8,7 +8,7 @@ Happy-path tests for game endpoints:
 """
 
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -422,39 +422,6 @@ async def test_get_game_playoff_metadata_null_for_regular(
     data = response.json()
     assert data["kind"] == "result"
     assert data["playoff_metadata"] is None
-
-
-@pytest.mark.asyncio
-async def test_get_upcoming_games_includes_game_type(
-    client,
-    session,
-    test_season,
-    test_home_team,
-    test_away_team,
-):
-    """Upcoming game list includes game_type on each entry."""
-    from nbajinni_shared.models.games import Game
-
-    near_future = date.today() + timedelta(days=1)
-    upcoming = Game(
-        id="UPCOMING01",
-        home_team_id=test_home_team.id,
-        away_team_id=test_away_team.id,
-        game_date=near_future,
-        tipoff_at=datetime.combine(near_future, datetime.min.time()).replace(hour=19),
-        season=test_season.season,
-        status=1,
-        game_type="regular",
-    )
-    session.add(upcoming)
-    await session.flush()
-
-    response = await client.get("/games/upcoming")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) >= 1
-    for game in data:
-        assert "game_type" in game
 
 
 @pytest.mark.asyncio
