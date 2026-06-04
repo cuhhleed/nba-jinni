@@ -1,39 +1,12 @@
-# NBA Jinni
+# Stats Jinni
 
 > The only NBA stats and performance tool you'll wish for.
 
-NBA Jinni is a full-stack web application for exploring NBA stats, live scores, standings, and player/team performance. It showcases a hybrid local-cloud architecture where data ingestion runs locally on a cron schedule and syncs to AWS via S3, while the frontend and API are fully serverless.
+Stats Jinni is a full-stack web application for exploring NBA stats, live scores, standings, and player/team performance. It showcases a hybrid local-cloud architecture where data ingestion runs locally on a cron schedule and syncs to AWS via S3, while the frontend and API are fully serverless.
 
 ---
 
 ## Architecture
-
-```
-Local Machine
-┌──────────────────────────────────────────┐
-│  Ingestion cron (nightly / on-demand)    │
-│  nba_api ──▶ PostgreSQL (local Docker)   │
-│  JSON export ──────────────────────────────────────┐
-└──────────────────────────────────────────┘          │ S3 upload
-                                                      ▼
-AWS Cloud                                    ┌─────────────────┐
-┌────────────────────────────────────────────│ S3 Data Exports │
-│                                            └───────┬─────────┘
-│                                                    │
-│                                           ┌────────▼─────────┐
-│                                           │  Loader Lambda   │
-│                                           │ (migrate + load) │
-│                                           └────────┬─────────┘
-│                                                    │
-│  Browser                              ┌────────────▼────────┐
-│     │                                 │  RDS PostgreSQL      │
-│     ├──▶ CloudFront ──▶ S3 (React)    │  (private VPC)       │
-│     │                                 └────────────▲────────┘
-│     └──▶ API Gateway ──▶ Lambda ───────────────────┘
-│                          (FastAPI)
-│                               └──▶ NBA API  (live scores, cached)
-└─────────────────────────────────────────────────────────────────
-```
 
 **Key design decisions:**
 
@@ -125,36 +98,18 @@ All seed scripts are idempotent — safe to re-run.
 ### 5. Run Ingestion
 
 ```bash
-cd ingestion
-
-poetry run python cli.py nightly           # Last night's game stats
-poetry run python cli.py roster            # Refresh team rosters
-poetry run python cli.py schedule          # Refresh regular season schedule
-poetry run python cli.py playoff-schedule  # Refresh playoff schedule
-poetry run python cli.py first-start       # Full historical backfill (run once)
+cd scripts
+./run_ingestion.sh
 ```
 
 See [`docs/LOCAL_OPERATIONS.md`](docs/LOCAL_OPERATIONS.md) for cron configuration and scheduling.
 
-### 6. Run the Frontend
-
+### 6. Configure Environment variables as shown in .env.example
+### 7. Deploy both the frontend and backend locally
 ```bash
-cd frontend
-npm run dev
+cd scripts
+./dev_launch
 ```
-
-Frontend runs at `http://localhost:5173`. The `VITE_API_BASE_URL` environment variable controls which backend it targets (defaults to the deployed API Gateway URL).
-
-### 7. Run the Backend Locally
-
-```bash
-cd backend
-poetry run uvicorn app.main:app --reload
-```
-
-API runs at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
-
----
 
 ## Cloud Deployment
 
@@ -188,20 +143,16 @@ All workflows authenticate to AWS via GitHub OIDC — no long-lived credentials 
 After local ingestion, push data to the cloud:
 
 ```bash
-# 1. Export local DB to JSON and upload to S3
-./scripts/run_cron_sync.sh
+cd scripts/
 
-# 2. Apply any pending migrations to RDS
-aws lambda invoke \
-  --function-name nbajinni-dev-data-loader \
-  --payload '{"action":"migrate"}' \
-  /dev/null
+./package_backend.sh
+./package_loader.sh
 
-# 3. Load exported data into RDS
-aws lambda invoke \
-  --function-name nbajinni-dev-data-loader \
-  --payload '{"action":"load"}' \
-  /dev/null
+./deploy_backend.sh
+./deploy_loader.sh
+./deploy_frontend.sh
+
+./invoke_loader migrate
 ```
 
 See [`docs/LOCAL_OPERATIONS.md`](docs/LOCAL_OPERATIONS.md) for the full sync runbook, including heartbeat monitoring and alert configuration.
@@ -217,65 +168,6 @@ S3 data exports are versioned with 30-day retention on old versions. To recover 
 3. If the schema is corrupted, invoke with `{"action":"migrate"}` first to replay Alembic migrations.
 
 ---
-
-## API Reference
-
-Base URL: API Gateway endpoint (see Terraform outputs or GitHub Actions deployment logs).
-
-### Live & Scores
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/games/live/today` | Live scoreboard — all games today with current scores |
-| `GET` | `/games/live/{game_id}` | Live box score for a single game |
-
-### Games
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/games/{game_id}` | Game detail — returns `GamePreview` (upcoming) or `GameResult` (completed) |
-| `GET` | `/games/{game_id}/playerstats` | Player box scores for a completed game |
-| `GET` | `/games/h2h?team_a={id}&team_b={id}` | Head-to-head games between two teams (current season) |
-
-### Teams
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/teams` | All 30 teams |
-| `GET` | `/teams/{team_id}` | Team detail with current standing |
-| `GET` | `/teams/{team_id}/roster` | Active roster |
-| `GET` | `/teams/{team_id}/games` | Schedule — 10 recent completed + 10 upcoming |
-| `GET` | `/teams/{team_id}/stats` | Season average stats + last 5 games |
-| `GET` | `/teams/{team_id}/season-average?type={regular\|playoff}` | Season averages by game type |
-
-### Players
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/players` | All active players |
-| `GET` | `/players/search?q={query}` | Search by name (min 2 chars) |
-| `GET` | `/players/top/preview` | Top 3 players per stat category (pts, reb, ast, stl, blk) |
-| `GET` | `/players/top/recent-performances?type={regular\|playoff\|all}` | Recent standout games |
-| `GET` | `/players/{player_id}` | Player profile |
-| `GET` | `/players/{player_id}/season-average?type={regular\|playoff}` | Season averages |
-| `GET` | `/players/{player_id}/last-5-games?type={regular\|playoff\|all}` | Last 5 game logs |
-| `GET` | `/players/{player_id}/vs-opponent?team_id={id}&type={regular\|playoff\|all}` | Stats vs a specific team |
-
-### Standings
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/standings` | Full standings ordered by conference and rank |
-| `GET` | `/standings/preview` | Top 10 teams by win percentage (cross-conference) |
-
-### Health
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Returns `{"status":"healthy"}` — verifies DB connectivity |
-
----
-
 ## Project Structure
 
 ```
