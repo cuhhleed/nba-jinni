@@ -22,7 +22,7 @@ export default function Teams() {
         {conferenceTeams.map((team) => (
           <CarpetBadge
             size="sm"
-            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center hover:bg-amber-500 m-2"
+            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center group hover:bg-amber-500 m-2"
             hoverable
           >
             <Link to={`/teams/${team.id}`} key={team.id}>
@@ -31,10 +31,10 @@ export default function Teams() {
                 alt={team.name}
                 className="mx-auto mb-1 sm:mb-2"
               />
-              <h2 className="text-xs sm:text-sm lg:text-base text-amber-500">
+              <h2 className="text-xs sm:text-sm lg:text-base text-amber-500 group-hover:text-sky-600">
                 {team.name}
               </h2>
-              <h3 className="text-xs sm:text-sm font-light text-sky-500">
+              <h3 className="text-xs sm:text-sm font-light text-sky-600">
                 ({team.code})
               </h3>
             </Link>
