@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         this.props.fallback ?? (
           <div className="p-8 text-center">
-            <h1 className="text-xl font-semibold mb-2">Something went wrong.</h1>
+            <h1 className="text-xl mb-2">Something went wrong.</h1>
             <p className="text-gray-600">
               Try refreshing the page. If the problem persists, please report it.
             </p>

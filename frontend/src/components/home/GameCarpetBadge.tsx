@@ -54,13 +54,13 @@ export default function GameCarpetBadge({
           <div className="flex items-center justify-between gap-1">
             <div className="flex items-center gap-1 min-w-0">
               <TeamLogo teamId={entry.home_team_id} size="sm" className="shrink-0" />
-              <span className="text-xs font-brand text-sky-500 truncate">
+              <span className="text-xs font-brand text-amber-500 group-hover:text-sky-600 truncate">
                 {home?.code ?? "—"}
               </span>
             </div>
             {entry.state !== "scheduled" && (
               <span
-                className={`text-sm font-bold shrink-0 ${
+                className={`text-sm shrink-0 ${
                   entry.state === "final"
                     ? homeWon
                       ? "text-green-500"
@@ -76,13 +76,13 @@ export default function GameCarpetBadge({
           <div className="flex items-center justify-between gap-1">
             <div className="flex items-center gap-1 min-w-0">
               <TeamLogo teamId={entry.away_team_id} size="sm" className="shrink-0" />
-              <span className="text-xs font-brand text-sky-500 truncate">
+              <span className="text-xs font-brand text-amber-500 group-hover:text-sky-600 truncate">
                 {away?.code ?? "—"}
               </span>
             </div>
             {entry.state !== "scheduled" && (
               <span
-                className={`text-sm font-bold shrink-0 ${
+                className={`text-sm shrink-0 ${
                   entry.state === "final"
                     ? homeWon === false
                       ? "text-green-500"
@@ -98,15 +98,13 @@ export default function GameCarpetBadge({
 
         {entry.state === "final" && (
           <div className="text-center">
-            <p className="text-[11px] text-amber-500 group-hover:text-sky-500 text-center mt-3">
-              Final
-            </p>
+            <p className="text-[11px] text-sky-500 text-center mt-3">Final</p>
           </div>
         )}
 
         {entry.state === "scheduled" && (
           <div className="text-center">
-            <span className="text-[10px] text-amber-500 group-hover:text-sky-500 text-center mt-1.5">
+            <span className="text-[10px]  text-sky-500 text-center mt-1.5">
               {tipoffLocal}
             </span>
           </div>

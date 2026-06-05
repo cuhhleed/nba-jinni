@@ -84,7 +84,7 @@ export default function StatLeaders() {
                 to={`/players/${row.player.id}`}
                 className={`${COL_GRID} bg-white border-b border-b-amber-500/20 px-2 py-1.5 divide-x divide-amber-500/20 hover:bg-amber-500/10 transition-colors`}
               >
-                <span className="text-xs font-semibold text-gray-700 text-center self-center">
+                <span className="text-xs text-gray-700 text-center self-center">
                   {i + 1}
                 </span>
                 <div className="flex items-center gap-1.5 px-1 min-w-0">
@@ -97,7 +97,7 @@ export default function StatLeaders() {
                     {row.player.first_name} {row.player.last_name}
                   </span>
                 </div>
-                <span className="text-xs font-bold text-gray-900 text-center self-center">
+                <span className="text-xs text-gray-900 text-center self-center">
                   {row[STAT_FIELD[activeTab]].toFixed(1)}
                 </span>
               </Link>

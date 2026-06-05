@@ -56,9 +56,7 @@ function StandingRow({
     <div
       className={`${COL_GRID} bg-white border-b border-b-amber-500/20 px-2 py-1.5 lg:py-2.5 divide-x divide-amber-500/20`}
     >
-      <span
-        className={`text-xs lg:text-sm font-semibold text-center self-center ${rankClassName}`}
-      >
+      <span className={`text-xs lg:text-sm text-center self-center ${rankClassName}`}>
         {rank}
       </span>
       <Link

@@ -64,7 +64,7 @@ export default function Top10Standings() {
                   to={`/teams/${s.team_id}`}
                   className={`${COL_GRID} bg-white border-b border-b-amber-500/20 px-2 py-1.5 divide-x divide-amber-500/20 hover:bg-amber-500/10 transition-colors`}
                 >
-                  <span className="text-xs text-gray-900 font-semibold text-center self-center">
+                  <span className="text-xs text-gray-900 text-center self-center">
                     {i + 1}
                   </span>
                   <div className="flex items-center gap-1 px-1">

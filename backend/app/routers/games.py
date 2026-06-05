@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from nba_api.live.nba.endpoints import BoxScore, ScoreBoard
 from nbajinni_shared.logging import configure_logging, get_logger
 from nbajinni_shared.models.games import Game
@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from ..cache.stale_cache import StaleCache
 from ..dependencies import get_current_season, get_db
+from ..limiter import limiter
 from ..schemas.game import (
     GameDetailResponse,
     GameLive,
@@ -167,7 +168,8 @@ async def get_h2h_games(
 
 
 @router.get("/games/live/today", response_model=LiveScoreboardResponse)
-async def get_live_scoreboard():
+@limiter.limit("30/minute")
+async def get_live_scoreboard(request: Request):
     cached = _live_cache.get_fresh("today")
     if cached is not None:
         logger.info("live_cache_hit", key="today")
@@ -236,7 +238,8 @@ async def get_live_scoreboard():
 
 
 @router.get("/games/live/{game_id}", response_model=GameLive)
-async def get_live_game(game_id: str, db: AsyncSession = Depends(get_db)):
+@limiter.limit("30/minute")
+async def get_live_game(request: Request, game_id: str, db: AsyncSession = Depends(get_db)):
     stmt = (
         select(Game)
         .where(Game.id == game_id)

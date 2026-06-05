@@ -16,7 +16,7 @@ function StatCell({ label, value }: StatCellProps) {
       <span className="text-[10px] uppercase tracking-wide text-amber-500 group-hover:text-sky-500">
         {label}
       </span>
-      <span className="text-sm font-bold text-sky-500">{value}</span>
+      <span className="text-sm text-sky-500">{value}</span>
     </div>
   );
 }
@@ -37,7 +37,7 @@ export default function RecentMagicCard({ performance }: Props) {
             size="md"
             className="shrink-0"
           />
-          <span className="text-sm font-semibold text-amber-500 group-hover:text-sky-500 truncate">
+          <span className="text-sm text-amber-500 group-hover:text-sky-500 truncate">
             {performance.full_name}
           </span>
         </div>

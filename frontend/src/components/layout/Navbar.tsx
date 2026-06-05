@@ -2,6 +2,7 @@ import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import SearchBar from "../ui/SearchBar";
+import MainLogo from "./MainLogo";
 
 const navLinks = (
   <ul className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-6">
@@ -39,11 +40,11 @@ export default function Navbar() {
     <>
       <nav className="sticky top-0 z-20 w-full bg-gray-900 border-b border-gray-700 px-4 py-3 lg:px-8">
         <div className="flex items-center justify-between">
-          <Link
-            to="/"
-            className="font-semibold font-brand text-lg text-sky-600 hover:text-amber-500"
-          >
-            NBA Jinni
+          <Link to="/" className="group flex items-center gap-2">
+            <MainLogo />
+            <span className="text-lg font-brand text-sky-600 group-hover:text-amber-500">
+              Stats Jinni
+            </span>
           </Link>
 
           <div className="hidden lg:flex flex-1 items-center gap-8 ml-8">

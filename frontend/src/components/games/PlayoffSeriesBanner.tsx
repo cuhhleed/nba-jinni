@@ -20,7 +20,7 @@ export default function PlayoffSeriesBanner({ playoff_metadata }: Props) {
 
   return (
     <>
-      <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-amber-500">
+      <p className="text-[10px] sm:text-xs uppercase tracking-widest text-amber-500">
         {gameLabel}
       </p>
       {playoff_metadata.series_record && (
