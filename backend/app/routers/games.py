@@ -239,7 +239,9 @@ async def get_live_scoreboard(request: Request):
 
 @router.get("/games/live/{game_id}", response_model=GameLive)
 @limiter.limit("30/minute")
-async def get_live_game(request: Request, game_id: str, db: AsyncSession = Depends(get_db)):
+async def get_live_game(
+    request: Request, game_id: str, db: AsyncSession = Depends(get_db)
+):
     stmt = (
         select(Game)
         .where(Game.id == game_id)
