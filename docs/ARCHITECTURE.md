@@ -6,52 +6,7 @@ NBAJinni uses a hybrid local-cloud architecture. Data ingestion runs locally on 
 
 ## System Diagram
 
-```
-Local Machine
-┌─────────────────────────────────────────────────────────┐
-│                                                          │
-│   Ingestion cron (nightly / weekly)                      │
-│   nba_api ──▶ PostgreSQL (Docker)                        │
-│                    │                                     │
-│            export to JSON                                │
-│                    │                                     │
-└────────────────────│─────────────────────────────────────┘
-                     │ aws s3 sync
-                     ▼
-AWS ─────────────────────────────────────────────────────────
-│                                                            │
-│   ┌─────────────────────┐                                  │
-│   │  S3 — Data Exports  │  (versioned, 30-day retention)   │
-│   └──────────┬──────────┘                                  │
-│              │ Lambda invoke (manual)                      │
-│              ▼                                             │
-│   ┌──────────────────────┐                                 │
-│   │   Loader Lambda      │  migrate + truncate + insert    │
-│   └──────────┬───────────┘                                 │
-│              │ private VPC                                 │
-│              ▼                                             │
-│   ┌──────────────────────┐                                 │
-│   │  RDS PostgreSQL 15   │  db.t3.micro, private subnet    │
-│   └──────────▲───────────┘                                 │
-│              │ SQLAlchemy (async)                          │
-│   ┌──────────┴───────────┐                                 │
-│   │  Backend Lambda      │  FastAPI + Mangum, private VPC  │
-│   └──────────▲───────────┘                                 │
-│              │             ┌──────────────────────────┐    │
-│              │             │  nba_api.live (cdn.nba.com)│  │
-│              └── /live/* ──│  in-process StaleCache    │   │
-│                            └──────────────────────────┘    │
-│   ┌──────────────────────┐                                 │
-│   │   API Gateway        │  HTTP API, CORS                 │
-│   └──────────▲───────────┘                                 │
-│              │                                             │
-│   ┌──────────┴───────────┐   ┌──────────────────────┐     │
-│   │  Browser (React SPA) │   │  CloudFront CDN       │     │
-│   └──────────────────────┘   │  S3 — Frontend bucket │     │
-│                              └──────────────────────┘      │
-└────────────────────────────────────────────────────────────┘
-```
-
+<img width="824" height="566" alt="NBAJINNI_ARCHITECTURE" src="https://github.com/user-attachments/assets/6de9c5df-1f79-4ee6-ac36-710c149cc586" />
 ---
 
 ## Components
