@@ -7,6 +7,8 @@ Stats Jinni is a full-stack web application for exploring NBA stats, live scores
 ---
 
 ## Architecture
+<img width="824" height="566" alt="NBAJINNI_ARCHITECTURE" src="https://github.com/user-attachments/assets/0f09b72c-cef0-4927-9e65-cc5c77411205" />
+
 
 **Key design decisions:**
 
