@@ -14,9 +14,7 @@ export default function GameCenterDisplay({ game }: Props) {
   if (game.kind === "preview") {
     return (
       <div className="flex items-center justify-center">
-        <span className="font-brand text-2xl sm:text-3xl lg:text-5xl text-sky-600">
-          VS
-        </span>
+        <span className="text-2xl sm:text-3xl lg:text-5xl text-sky-600">VS</span>
       </div>
     );
   }
@@ -38,7 +36,7 @@ export default function GameCenterDisplay({ game }: Props) {
         </div>
         {game.is_final ? (
           <>
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-sky-600">
+            <span className="text-[10px] sm:text-xs uppercase tracking-wide text-sky-600">
               FINAL
             </span>
             <span className="text-[9px] sm:text-[10px] italic text-gray-700">
@@ -47,7 +45,7 @@ export default function GameCenterDisplay({ game }: Props) {
           </>
         ) : (
           <>
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-amber-600">
+            <span className="text-[10px] sm:text-xs uppercase tracking-wide text-amber-600">
               {game.game_status_text}
             </span>
           </>

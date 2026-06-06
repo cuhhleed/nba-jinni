@@ -8,7 +8,12 @@ from nbajinni_shared.logging import configure_logging, get_logger
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 from .dependencies import get_db
+from .limiter import limiter
 from .routers import games, players, standings, teams
 
 load_dotenv()
@@ -17,6 +22,9 @@ configure_logging()
 logger = get_logger("backend_api")
 
 app = FastAPI()
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 allowed_origins = [
     o.strip()
@@ -33,6 +41,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(players.router)
 app.include_router(teams.router)

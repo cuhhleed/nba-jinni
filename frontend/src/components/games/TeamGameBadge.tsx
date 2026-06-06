@@ -23,16 +23,11 @@ export default function TeamGameBadge({ team }: Props) {
       to={`/teams/${team.id}`}
       className="flex flex-col items-center gap-1 hover:opacity-80 transition-opacity"
     >
-      <TeamLogo
-        size="md"
-        teamId={team.id}
-        alt={team.name}
-        className="mx-auto"
-      />
-      <span className="text-[10px] sm:text-xs lg:text-sm font-semibold font-brand text-sky-600 text-center">
+      <TeamLogo size="md" teamId={team.id} alt={team.name} className="mx-auto" />
+      <span className="text-[10px] sm:text-xs lg:text-sm text-amber-500 text-center">
         {team.name}
       </span>
-      <span className="text-[10px] sm:text-xs text-sky-600 text-center">
+      <span className="text-[10px] sm:text-xs font-light text-sky-600 text-center">
         {team.code}
       </span>
       {standing && (

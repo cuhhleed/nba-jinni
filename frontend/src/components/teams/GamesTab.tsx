@@ -1,11 +1,11 @@
 import { Link, useParams } from "react-router";
 import { useTeamSchedule } from "../../hooks/useTeamSchedule";
+import { formatLocalDate } from "../../lib/datetime";
 import type { GameBase, GameWithTeamStats } from "../../types/games";
 import EmptyState from "../ui/EmptyState";
 import ErrorPage from "../ui/ErrorPage";
 import LoadingPage from "../ui/LoadingPage";
 import TeamLogo from "./TeamLogo";
-import { formatLocalDate } from "../../lib/datetime";
 
 export default function GamesTab() {
   const { id } = useParams();
@@ -88,8 +88,8 @@ function buildNextGames(nextGames: GameBase[], teamId: number) {
 function buildNextGame(game: GameBase, teamId: number) {
   const [oppId, isHome] =
     game.home_team_id != teamId
-      ? [game.home_team_id, true]
-      : [game.away_team_id, false];
+      ? [game.home_team_id, false]
+      : [game.away_team_id, true];
 
   return (
     <Link

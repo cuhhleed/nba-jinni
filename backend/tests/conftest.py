@@ -33,6 +33,7 @@ from nbajinni_shared.models.teams import Team
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.dependencies import get_db
+from app.limiter import limiter
 from app.main import app
 from app.routers.games import _live_cache
 
@@ -51,6 +52,16 @@ def reset_live_cache():
     """Clear the module-level StaleCache before each test to prevent
     cross-test pollution."""
     _live_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset the rate limiter storage before each test to prevent
+    cross-test pollution from accumulated request counts.
+
+    slowapi's Limiter holds a `limits` MemoryStorage at `_storage`; its
+    public `reset()` clears the counter and expiration state."""
+    limiter._storage.reset()
 
 
 # ---------------------------------------------------------------------------

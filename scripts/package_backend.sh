@@ -18,6 +18,7 @@ mkdir -p "$DIST_DIR"
 pip install \
   fastapi \
   mangum \
+  slowapi \
   "sqlalchemy[asyncio]" \
   asyncpg \
   pydantic \

@@ -22,7 +22,7 @@ export default function Teams() {
         {conferenceTeams.map((team) => (
           <CarpetBadge
             size="sm"
-            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center hover:bg-amber-500 m-2"
+            className="team-badge p-2 sm:p-3 lg:p-4 grid grid-cols-1 text-center group hover:bg-amber-500 m-2"
             hoverable
           >
             <Link to={`/teams/${team.id}`} key={team.id}>
@@ -31,10 +31,10 @@ export default function Teams() {
                 alt={team.name}
                 className="mx-auto mb-1 sm:mb-2"
               />
-              <h2 className="text-xs sm:text-sm lg:text-base font-semibold font-brand text-amber-500">
+              <h2 className="text-xs sm:text-sm lg:text-base text-amber-500 group-hover:text-sky-600">
                 {team.name}
               </h2>
-              <h3 className="text-xs sm:text-sm font-light text-sky-500">
+              <h3 className="text-xs sm:text-sm font-light text-sky-600">
                 ({team.code})
               </h3>
             </Link>
@@ -45,19 +45,13 @@ export default function Teams() {
 
     return (
       <PageContainer>
-        <h1 className="text-2xl text-center text-sky-600 font-semibold font-brand mb-4">
-          Teams
-        </h1>
+        <h1 className="text-2xl text-center text-sky-600 mb-4">Teams</h1>
         <section className="mb-10">
-          <h2 className="text-xl font-semibold text-sky-600 mb-4">
-            Eastern Conference
-          </h2>
+          <h2 className="text-xl text-sky-600 mb-4">Eastern Conference</h2>
           {renderGrid(eastern)}
         </section>
         <section>
-          <h2 className="text-xl font-semibold font-brand text-sky-600 mb-4">
-            Western Conference
-          </h2>
+          <h2 className="text-xl text-sky-600 mb-4">Western Conference</h2>
           {renderGrid(western)}
         </section>
       </PageContainer>
