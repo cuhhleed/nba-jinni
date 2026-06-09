@@ -712,3 +712,69 @@ Story 7.1 (ADR-010) established OIDC + per-env IAM roles. Stories 7.2–7.6 wire
 - [ ] Verify end-to-end: apply, click email confirmation, trigger a test alarm
 
 ---
+
+## FEATURE-013 — Dynamic Lambda Dependency Bundling from Poetry
+
+### Status
+
+PROPOSED
+
+### Background
+
+Both Lambda packaging scripts build their deployment zips by `pip install`-ing a **hardcoded list** of packages into `dist/`: `scripts/package_backend.sh:18-30` and `scripts/package_loader.sh:18-25`. Each list must be manually kept in sync with its package's `pyproject.toml`. This drift is invisible to the test suite (CI runs `poetry install`, which pulls in every declared dependency) and to the deploy step (the zip uploads and `update-function-code` succeeds regardless of contents) — it surfaces only when the Lambda cold-starts and a runtime `import` fails, which is caught last in the pipeline by the `/health` smoke test (FEATURE-009).
+
+This was hit in practice: the rate-limiting work added `from slowapi import ...` to `backend/app/main.py` and declared `slowapi` in `backend/pyproject.toml`, but did not add `slowapi` to `package_backend.sh`'s list. The deployed Lambda raised `Runtime.ImportModuleError` on every invocation; `/health` returned 500; the smoke test failed all three attempts. It was quick-fixed by appending `slowapi` to the hardcoded list (`scripts/package_backend.sh:21`) — a patch that does not address the underlying drift hazard and leaves the same trap for the next dependency.
+
+### Problem
+
+- Two hardcoded dependency lists (`package_backend.sh`, `package_loader.sh`) must be manually synchronized with two `pyproject.toml` files. The source of truth (Poetry) and the deployed artifact (the zip) can diverge with no signal until cold-start.
+- The failure mode is maximally delayed and expensive: green tests, green deploy, red smoke test — the regression is only observable at the end of the pipeline against already-deployed code.
+- **Latent landmines (under-bundling).** `passlib`, `python-jose`, and `python-multipart` are declared runtime deps in `backend/pyproject.toml` that are absent from `package_backend.sh`'s list. They are harmless only because no currently-loaded module imports them; wiring up auth will reproduce the `slowapi` cold-start failure verbatim.
+- **Over-bundling.** The inverse problem also exists: `uvicorn` (a local-dev server — Mangum is the Lambda adapter) and `alembic` (migrations, owned by the Loader) are backend main-group deps that the request handler does not need at runtime. A naive "bundle everything in main" approach would inflate the backend zip.
+- The two Lambdas have genuinely different runtime sets (backend needs `fastapi`/`mangum`/`slowapi`/`nba-api`; loader needs `alembic` and no web framework), so a single shared requirements file cannot serve both.
+
+### Constraints
+
+- `nbajinni-shared` is a local path/editable dependency (`{ path = "../shared", develop = true }` in both `pyproject.toml` files) and is bundled separately via `rsync` of `nbajinni_shared/` (ADR-001). `poetry export` emits it as a path/editable entry that will not `pip install --target` cleanly from the Lambda build cwd — it must be excluded from any generated requirements, and the existing `rsync` of `nbajinni_shared/` must be preserved unchanged.
+- The CI zip-content assertions must still pass: backend asserts `nbajinni_shared/` + `nba_api/` are present (`.github/workflows/backend.yml:157-162` and `:229-234`); loader asserts `nbajinni_shared/` + `alembic/`.
+- Dev dependencies (`pytest`, `pytest-asyncio`, `httpx`, `black`, `flake8`, `isort`) must never be bundled — the export/install must scope to runtime deps only.
+- The `deploy-dev` and `deploy-prod` jobs in `backend.yml` (and their loader equivalents) currently install only `setup-python` + Terraform + AWS creds — they do **not** install Poetry (only the `pr-checks` job does, `backend.yml:80-81`). If the packaging script calls `poetry export` at build time, those deploy jobs must gain a Poetry install step; the alternative is to commit a generated requirements file consumed by the script, guarded by a CI staleness check.
+- Poetry is pinned to `1.8.3` in CI (`pipx install poetry==1.8.3`). `poetry export` emits a deprecation notice under 1.8 and may require the `poetry-plugin-export` plugin on newer Poetry — the chosen mechanism must pin/document this.
+- The fix must apply consistently to **both** packaging scripts; fixing only the backend leaves the loader exposed to the identical failure.
+
+### Proposed Solution
+
+Derive each Lambda's bundled dependencies from its `pyproject.toml` so the artifact can never silently drift from the declared dependency set. Two candidate mechanisms — the choice is a decision point for the team, not prescribed here:
+
+1. **Poetry dependency groups.** Define an explicit `lambda-runtime` grouping per package (e.g. move `uvicorn`/`alembic` out of the backend's runtime set, keep `fastapi`/`mangum`/`slowapi`/`nba-api` in it) and export/install only that group. Most precise — solves both under- and over-bundling — but requires restructuring the `pyproject.toml` groups and is the larger change.
+2. **Plain export of the main group.** `poetry export --only main --without-hashes -f requirements.txt`, filter out the local path dep (`nbajinni-shared`), then `pip install -r requirements.txt --target "$DIST_DIR"`. Simplest change; still bundles `uvicorn`/`alembic` unless they are moved to a non-runtime group, so it trades a little zip size for simplicity.
+
+Either way: retain the existing `rsync` of `nbajinni_shared/` (and the loader's `alembic.ini` + `alembic/` copy), retain the CI zip-content assertions, and ensure the deploy jobs have whatever tooling the script needs at build time. Shared logic between the two scripts may be factored into a small helper if it reduces duplication — a minor judgment call, not a requirement.
+
+**Decision points to resolve before implementation** (flagged, not decided here):
+
+- (a) Dependency groups vs. plain `--only main` export.
+- (b) Whether to accept over-bundling `uvicorn`/`alembic` in the backend zip or move them into a non-runtime group.
+- (c) Whether deploy jobs install Poetry at build time, or whether a generated `requirements.txt` is committed per package and guarded by a CI staleness check.
+- (d) Optional defense-in-depth: a CI step that imports the handler module (`app.main`) in a clean environment to catch any missing runtime dependency *before* the smoke test, rather than relying on declared-deps parity alone.
+
+### Watch Points
+
+- The temporary hardcoded `slowapi` line (`scripts/package_backend.sh:21`) must be removed when this lands, so the dynamic resolution and the manual patch do not coexist.
+- The local path dep (`nbajinni-shared`) must be filtered from any exported requirements; otherwise `pip` will attempt to resolve `../shared` from the Lambda build cwd and fail.
+- Export with hashes (`poetry export` default) fails `pip install` if any transitive dep lacks a hash — use `--without-hashes`.
+- Backend and loader runtime sets diverge — a single shared requirements file would wrongly bundle `fastapi` into the loader. Keep resolution per-package.
+- `poetry export` deprecation / plugin requirement under the pinned Poetry `1.8.3`.
+
+### Tasks
+
+- [ ] Decide the mechanism (dependency groups vs. plain `--only main` export) and how deploy jobs obtain runtime deps (build-time Poetry vs. committed + staleness-checked `requirements.txt`)
+- [ ] Rewrite `scripts/package_backend.sh` to derive runtime deps from `backend/pyproject.toml`, excluding the local path dep and retaining the `nbajinni_shared/` rsync
+- [ ] Apply the same approach to `scripts/package_loader.sh` (retaining the `alembic.ini` + `alembic/` copy)
+- [ ] Remove the temporary hardcoded `slowapi` line from `scripts/package_backend.sh` once dynamic resolution covers it
+- [ ] If build-time Poetry is chosen: add an "Install Poetry" step to the `deploy-dev`/`deploy-prod` jobs in `.github/workflows/backend.yml` and `.github/workflows/loader.yml`; otherwise commit generated requirements per package and add a CI staleness check
+- [ ] Confirm the existing zip-content assertions still pass (`nbajinni_shared/` + `nba_api/` for backend; `nbajinni_shared/` + `alembic/` for loader)
+- [ ] (Optional) Add a clean-environment handler-import check in CI as defense-in-depth before the smoke test
+- [ ] Verify end-to-end: add a throwaway runtime dep to `pyproject.toml`, confirm it appears in the zip with no script edit, and confirm the smoke test stays green
+
+---
